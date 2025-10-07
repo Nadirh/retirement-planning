@@ -1,0 +1,60 @@
+@import "tailwindcss";
+
+/* Accessibility-First Theme for 60+ Users */
+:root {
+  /* High contrast colors - WCAG AA compliant */
+  --background: #ffffff;
+  --foreground: #1a1a1a;
+  --primary: #2563eb; /* Blue - good contrast */
+  --primary-dark: #1e40af;
+  --secondary: #059669; /* Green for success */
+  --error: #dc2626; /* Red for errors */
+  --border: #d1d5db;
+  --input-bg: #f9fafb;
+
+  /* Focus ring for keyboard navigation */
+  --focus-ring: 0 0 0 3px rgba(37, 99, 235, 0.5);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
+  font-size: 18px; /* Larger base font for readability */
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* High-visibility focus indicators */
+*:focus-visible {
+  outline: 3px solid var(--primary);
+  outline-offset: 2px;
+  box-shadow: var(--focus-ring);
+}
+
+/* Remove default focus styles but keep for keyboard users */
+*:focus:not(:focus-visible) {
+  outline: none;
+}
+
+/* Large, accessible buttons */
+button, a {
+  min-height: 44px;
+  min-width: 44px;
+  cursor: pointer;
+}
+
+/* Smooth transitions for better UX */
+* {
+  transition-property: background-color, border-color, color, fill, stroke;
+  transition-duration: 150ms;
+  transition-timing-function: ease-in-out;
+}
