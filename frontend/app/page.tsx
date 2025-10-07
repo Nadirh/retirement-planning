@@ -642,7 +642,7 @@ export default function Home() {
                       📉 Want to see the worst-case scenario?
                     </h3>
                     <p className="text-lg text-gray-700 mb-4">
-                      See how your optimal allocation ({sweepResults.bestAllocation.stockPercent}% stocks / {sweepResults.bestAllocation.bondPercent}% bonds) would have performed if you retired in <strong>March 1999</strong>—the start of the worst 10-year period in stock market history (including both the dot-com crash and the 2008 Financial Crisis).
+                      See how your optimal allocation ({sweepResults.bestAllocation.stockPercent}% stocks / {sweepResults.bestAllocation.bondPercent}% bonds) would have performed if you retired in <strong>March 2000</strong>—right at the dot-com bubble peak, just before both the dot-com crash and the 2008 Financial Crisis.
                     </p>
                     <button
                       onClick={handleStressTest}
@@ -679,7 +679,7 @@ export default function Home() {
                   📉 Historical Stress Test: {stressTestResults.startDate} Retirement
                 </h2>
                 <p className="text-xl opacity-90">
-                  Worst 10-year period in stock market history (March 1999 - February 2009: -29.5% total return)
+                  Retiring at the dot-com bubble peak (March 2000 - March 2010: +2.8% total return over 10 years)
                 </p>
               </div>
 
@@ -798,7 +798,7 @@ export default function Home() {
                     <li>Withdrawal rate: {stressTestResults.withdrawalRate.toFixed(1)}% annually</li>
                     <li>No portfolio rebalancing</li>
                     <li>Starting portfolio of $1,000,000 is used as an example for illustration</li>
-                    <li>March 1999 marks the beginning of the worst 10-year period in stock market history (-29.5% through Feb 2009, including both dot-com crash and financial crisis)</li>
+                    <li>March 2000 was the dot-com bubble peak (S&P 500 peaked March 24, 2000), followed by both the dot-com crash (2000-2002) and financial crisis (2008-2009)</li>
                   </ul>
                 </div>
               </div>

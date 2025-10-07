@@ -218,16 +218,17 @@ def run_monte_carlo(years, withdrawal_rate, inflation_input, stock_allocation, b
 
 def run_historical_stress_test(years, withdrawal_rate, stock_allocation, bond_allocation):
     """
-    Run a deterministic historical simulation starting March 1999
+    Run a deterministic historical simulation starting March 2000
 
-    This simulates the worst time to retire (worst 10-year period in stock market history)
-    using actual historical data from March 1999 through December 2024.
+    This simulates retiring at the dot-com bubble peak (March 24, 2000 was the
+    historical S&P 500 peak) using actual historical data from March 2000 through
+    December 2024.
 
-    March 1999 - February 2009 saw -29.48% total return, including both the
-    dot-com crash (2000-2002) and the financial crisis (2008-2009).
+    March 2000 - March 2010 saw only +2.81% total return (+0.28% annualized),
+    including both the dot-com crash (2000-2002) and the financial crisis (2008-2009).
 
     Parameters:
-    - years: Number of years in retirement (if ≤25, stop at Mar 2024; if ≥26, stop at Dec 2024)
+    - years: Number of years in retirement (if ≤24, stop at Mar 2024; if ≥25, stop at Dec 2024)
     - withdrawal_rate: Annual withdrawal as % of portfolio (decimal)
     - stock_allocation: % in stocks (decimal)
     - bond_allocation: % in bonds (decimal)
@@ -241,8 +242,8 @@ def run_historical_stress_test(years, withdrawal_rate, stock_allocation, bond_al
     df = pd.read_csv(Path(__file__).parent.parent / 'data' / 'monthly_returns.csv')
     df['Date'] = pd.to_datetime(df['Date'])
 
-    # Stress test configuration: March 1999 (worst 10-year period)
-    start_year = 1999
+    # Stress test configuration: March 2000 (dot-com bubble peak)
+    start_year = 2000
     start_month = 3  # March
     start_day = 31
     anniversary_month = 3  # Record values every March
@@ -250,8 +251,8 @@ def run_historical_stress_test(years, withdrawal_rate, stock_allocation, bond_al
     start_date = pd.to_datetime(f'{start_year}-{start_month:02d}-{start_day}')
     historical_subset = df[df['Date'] >= start_date].reset_index(drop=True)
 
-    # Determine end date based on years (25 years from March 1999 = March 2024)
-    years_from_start = 2024 - start_year  # 25 years available
+    # Determine end date based on years (24 years from March 2000 = March 2024)
+    years_from_start = 2024 - start_year  # 24 years available
     if years <= years_from_start:
         # Stop at anniversary month in final year
         max_months = years * 12
