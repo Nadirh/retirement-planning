@@ -2,6 +2,18 @@
 
 import { useState, FormEvent } from 'react';
 
+interface MonteCarloResult {
+  successRate: number;
+  totalSimulations: number;
+  successes: number;
+  failures: number;
+  details: {
+    avgFinalPortfolio: number;
+    medianYearsToFailure: number | null;
+    usedBootstrap: boolean;
+  };
+}
+
 export default function Home() {
   const [formData, setFormData] = useState({
     yearsInRetirement: '',
@@ -17,6 +29,8 @@ export default function Home() {
 
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [isListening, setIsListening] = useState<string | null>(null);
+  const [isSimulating, setIsSimulating] = useState(false);
+  const [results, setResults] = useState<MonteCarloResult | null>(null);
 
   // Text-to-speech function with female voice
   const speak = (text: string) => {
@@ -155,19 +169,53 @@ export default function Home() {
     return isValid;
   };
 
-  const handleSubmit = (e: FormEvent) => {
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
 
-    if (validateForm()) {
-      console.log('Form submitted successfully:', formData);
-      alert(`Form submitted!\n\nYears in retirement: ${formData.yearsInRetirement}\nWithdrawal rate: ${formData.withdrawalRate}%\nInflation rate: ${formData.inflationRate}%`);
-    } else {
+    if (!validateForm()) {
       // Announce errors for screen readers
       const errorMessages = Object.values(errors).filter(e => e).join('. ');
       if (errorMessages) {
         const errorAnnouncement = `Please fix the following errors: ${errorMessages}`;
         speak(errorAnnouncement);
       }
+      return;
+    }
+
+    // Clear previous results
+    setResults(null);
+    setIsSimulating(true);
+
+    try {
+      // Call Monte Carlo API
+      const response = await fetch('/api/monte-carlo', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          years: parseInt(formData.yearsInRetirement),
+          withdrawalRate: parseFloat(formData.withdrawalRate),
+          inflation: formData.inflationRate ? parseFloat(formData.inflationRate) : null,
+          stockAllocation: 70,
+          bondAllocation: 30,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Simulation failed');
+      }
+
+      const data: MonteCarloResult = await response.json();
+      setResults(data);
+
+      // Announce results for screen readers
+      speak(`Simulation complete. Your retirement plan has a ${data.successRate.toFixed(1)} percent success rate based on 100 simulations.`);
+    } catch (error) {
+      console.error('Monte Carlo simulation error:', error);
+      alert('Sorry, the simulation failed. Please try again.');
+    } finally {
+      setIsSimulating(false);
     }
   };
 
@@ -392,13 +440,115 @@ export default function Home() {
               <div className="pt-6">
                 <button
                   type="submit"
-                  className="w-full py-5 px-8 text-2xl font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-4 focus:ring-blue-500 focus:ring-offset-2 transition-colors shadow-lg hover:shadow-xl"
+                  disabled={isSimulating}
+                  className="w-full py-5 px-8 text-2xl font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-4 focus:ring-blue-500 focus:ring-offset-2 transition-colors shadow-lg hover:shadow-xl disabled:bg-gray-400 disabled:cursor-not-allowed"
                 >
-                  Calculate My Retirement Plan
+                  {isSimulating ? 'Running Simulation...' : 'Calculate My Retirement Plan'}
                 </button>
               </div>
             </div>
           </form>
+
+          {/* Loading Indicator */}
+          {isSimulating && (
+            <div className="mt-8 p-6 bg-blue-50 border-2 border-blue-200 rounded-lg text-center" role="status" aria-live="polite">
+              <div className="animate-spin mx-auto w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full mb-4"></div>
+              <p className="text-xl text-blue-800 font-medium">
+                Running 100 Monte Carlo simulations...
+              </p>
+              <p className="text-lg text-blue-700 mt-2">
+                This may take a few seconds
+              </p>
+            </div>
+          )}
+
+          {/* Results Display */}
+          {results && !isSimulating && (
+            <div className="mt-8 p-8 bg-white border-4 rounded-2xl shadow-xl" role="region" aria-label="Simulation Results">
+              <h2 className="text-3xl font-bold text-gray-900 mb-6 text-center">
+                Your Retirement Plan Results
+              </h2>
+
+              {/* Success Rate - Large Display */}
+              <div className={`text-center p-8 rounded-xl mb-6 ${
+                results.successRate >= 90 ? 'bg-green-100 border-4 border-green-500' :
+                results.successRate >= 75 ? 'bg-yellow-100 border-4 border-yellow-500' :
+                'bg-red-100 border-4 border-red-500'
+              }`}>
+                <p className="text-2xl font-semibold mb-2 text-gray-700">Success Rate</p>
+                <p className={`text-6xl sm:text-7xl font-bold ${
+                  results.successRate >= 90 ? 'text-green-700' :
+                  results.successRate >= 75 ? 'text-yellow-700' :
+                  'text-red-700'
+                }`}>
+                  {results.successRate.toFixed(1)}%
+                </p>
+                <p className="text-xl mt-4 text-gray-700">
+                  {results.successRate >= 90 ? '✅ Excellent! Your plan looks very strong.' :
+                   results.successRate >= 75 ? '⚠️ Good, but consider reducing withdrawal rate.' :
+                   '❌ High risk. Consider reducing withdrawal rate or increasing bond allocation.'}
+                </p>
+              </div>
+
+              {/* Detailed Statistics */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-6">
+                <div className="p-6 bg-gray-50 rounded-xl border-2 border-gray-200">
+                  <p className="text-lg font-semibold text-gray-700 mb-2">Successful Scenarios</p>
+                  <p className="text-4xl font-bold text-green-600">{results.successes}</p>
+                  <p className="text-gray-600 mt-1">out of {results.totalSimulations}</p>
+                </div>
+
+                <div className="p-6 bg-gray-50 rounded-xl border-2 border-gray-200">
+                  <p className="text-lg font-semibold text-gray-700 mb-2">Failed Scenarios</p>
+                  <p className="text-4xl font-bold text-red-600">{results.failures}</p>
+                  <p className="text-gray-600 mt-1">ran out of money</p>
+                </div>
+              </div>
+
+              {/* Additional Details */}
+              {results.successes > 0 && (
+                <div className="p-6 bg-blue-50 rounded-xl border-2 border-blue-200 mb-4">
+                  <p className="text-lg font-semibold text-gray-700 mb-2">Average Final Portfolio (Successful Cases)</p>
+                  <p className="text-3xl font-bold text-blue-700">
+                    ${results.details.avgFinalPortfolio.toLocaleString('en-US', { maximumFractionDigits: 0 })}
+                  </p>
+                </div>
+              )}
+
+              {results.details.medianYearsToFailure !== null && (
+                <div className="p-6 bg-orange-50 rounded-xl border-2 border-orange-200 mb-4">
+                  <p className="text-lg font-semibold text-gray-700 mb-2">Median Years Until Failure (Failed Cases)</p>
+                  <p className="text-3xl font-bold text-orange-700">
+                    {results.details.medianYearsToFailure.toFixed(1)} years
+                  </p>
+                </div>
+              )}
+
+              {/* Methodology */}
+              <div className="mt-6 p-4 bg-gray-100 rounded-lg text-sm text-gray-700">
+                <p className="font-semibold mb-2">📊 Methodology:</p>
+                <ul className="list-disc list-inside space-y-1">
+                  <li>100 Monte Carlo simulations using historical bootstrap (1988-2024)</li>
+                  <li>Portfolio: 70% stocks (S&P 500), 30% bonds (5-Year Treasury)</li>
+                  <li>Inflation: {results.details.usedBootstrap ? 'Historical bootstrap' : `Fixed at ${formData.inflationRate}%`}</li>
+                  <li>Withdrawals adjusted annually for inflation</li>
+                </ul>
+              </div>
+
+              {/* Run Again Button */}
+              <div className="mt-8 text-center">
+                <button
+                  onClick={() => {
+                    setResults(null);
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                  }}
+                  className="px-8 py-4 text-xl font-semibold text-blue-600 bg-white border-2 border-blue-600 rounded-lg hover:bg-blue-50 focus:outline-none focus:ring-4 focus:ring-blue-500 focus:ring-offset-2 transition-colors"
+                >
+                  Adjust Parameters & Run Again
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* Text-to-speech indicator */}
           {isSpeaking && (

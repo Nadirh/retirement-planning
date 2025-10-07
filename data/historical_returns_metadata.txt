@@ -1,0 +1,78 @@
+Historical Market Data - Metadata
+================================================================================
+
+Data Sources:
+-------------
+1. S&P 500 Total Returns
+   - Source: Robert Shiller, Yale University
+   - URL: http://www.econ.yale.edu/~shiller/data.htm
+   - Calculation: (Price[t] + Dividend[t]) / Price[t-1] - 1
+   - Coverage: 1965-01-01 00:00:00 to 2023-06-01 00:00:00
+
+2. 5-Year Treasury Total Returns
+   - Source: FRED (Federal Reserve Economic Data)
+   - URL: https://fred.stlouisfed.org/series/DGS5
+   - Series: DGS5 (5-Year Treasury Constant Maturity Rate)
+   - Calculation Method: Modified Duration Approximation
+   - Modified Duration: 4.25 years
+   - Formula: Total Return = (Yield/12) - (Duration × ΔYield)
+   - Coverage: 1965-01-31 00:00:00 to 2024-12-31 00:00:00
+
+3. 10-Year Treasury Total Returns
+   - Source: FRED (Federal Reserve Economic Data)
+   - URL: https://fred.stlouisfed.org/series/DGS10
+   - Series: DGS10 (10-Year Treasury Constant Maturity Rate)
+   - Calculation Method: Modified Duration Approximation
+   - Modified Duration: 8.5 years
+   - Formula: Total Return = (Yield/12) - (Duration × ΔYield)
+   - Coverage: 1965-01-31 00:00:00 to 2024-12-31 00:00:00
+
+4. CPI Inflation
+   - Source: FRED (Federal Reserve Economic Data)
+   - URL: https://fred.stlouisfed.org/series/CPIAUCSL
+   - Series: CPIAUCSL (Consumer Price Index for All Urban Consumers)
+   - CPI_Monthly: Month-over-month inflation rate
+   - CPI_Annual: 12-month (year-over-year) inflation rate
+   - Coverage: 1965-01-01 00:00:00 to 2024-12-01 00:00:00
+
+Bond Math Methodology:
+----------------------
+Treasury yields are converted to total returns using the modified duration approximation:
+
+Total Return = Coupon Income + Capital Gain/Loss
+             = (Yield / 12) - (Modified Duration × Change in Yield)
+
+This is the industry-standard approach when actual bond prices are unavailable.
+
+Duration Values Used:
+- 5-Year Treasury: 4.25 years (based on CME Group data and academic research)
+- 10-Year Treasury: 8.5 years (based on CME Group data and academic research)
+
+Validation:
+-----------
+10-Year Treasury returns will be cross-validated against Aswath Damodaran's annual data:
+- Source: https://pages.stern.nyu.edu/~adamodar/New_Home_Page/datafile/histretSP.html
+- Acceptable variance: ±0.2% annually
+
+Data Quality Notes:
+-------------------
+- Missing values in FRED data are forward-filled from previous valid observation
+- End-of-month values are used for all monthly calculations
+- First month of each series may be NaN due to diff() calculations
+
+Output File Format:
+-------------------
+Filename: data/historical_returns_1965_2024.csv
+Columns:
+  - Date: End of month date (YYYY-MM-DD)
+  - SP500_Return: Monthly total return (decimal, e.g., 0.05 = 5%)
+  - Treasury_5Y_Return: Monthly total return (decimal)
+  - Treasury_10Y_Return: Monthly total return (decimal)
+  - CPI_Monthly: Month-over-month inflation (decimal)
+  - CPI_Annual: 12-month inflation rate (decimal)
+
+Date Range: 1965-01-01 to 2024-12-31
+Total Months: 719
+
+Generated: 2025-10-07 16:12:22
+Script: download_historical_data.py
