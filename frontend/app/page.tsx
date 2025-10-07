@@ -60,8 +60,13 @@ export default function Home() {
       return;
     }
 
-    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    const recognition = new SpeechRecognition();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const SpeechRecognitionAPI = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+
+    if (!SpeechRecognitionAPI) return;
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const recognition = new SpeechRecognitionAPI() as any;
 
     recognition.lang = 'en-US';
     recognition.continuous = false;
@@ -69,6 +74,7 @@ export default function Home() {
 
     setIsListening(field);
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     recognition.onresult = (event: any) => {
       const transcript = event.results[0][0].transcript;
       // Extract numbers from speech
@@ -81,6 +87,7 @@ export default function Home() {
       setIsListening(null);
     };
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     recognition.onerror = (event: any) => {
       console.error('Speech recognition error:', event.error);
       alert('Could not understand. Please try again.');
