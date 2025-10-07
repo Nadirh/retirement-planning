@@ -2,18 +2,6 @@
 
 import { useState, FormEvent } from 'react';
 
-interface MonteCarloResult {
-  successRate: number;
-  totalSimulations: number;
-  successes: number;
-  failures: number;
-  details: {
-    avgFinalPortfolio: number;
-    medianYearsToFailure: number | null;
-    usedBootstrap: boolean;
-  };
-}
-
 interface AllocationData {
   stockPercent: number;
   bondPercent: number;
@@ -191,8 +179,7 @@ export default function Home() {
     return isValid;
   };
 
-  const handleAllocationSweep = async (e?: FormEvent) => {
-    if (e) e.preventDefault();
+  const handleAllocationSweep = async () => {
     if (!validateForm()) {
       const errorMessages = Object.values(errors).filter(e => e).join('. ');
       if (errorMessages) {
@@ -253,7 +240,7 @@ export default function Home() {
 
         {/* Main Form Card */}
         <div className="bg-white rounded-2xl shadow-lg p-8 sm:p-12">
-          <form onSubmit={handleSubmit} noValidate>
+          <form onSubmit={(e) => { e.preventDefault(); handleAllocationSweep(); }} noValidate>
             <div className="space-y-8">
 
               {/* Question 1: Years in Retirement */}
