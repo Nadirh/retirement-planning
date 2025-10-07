@@ -237,9 +237,14 @@ export default function Home() {
           <h1 className="text-4xl sm:text-5xl font-bold text-gray-900 mb-4">
             Longevity Planning
           </h1>
-          <p className="text-xl text-gray-700">
+          <p className="text-xl text-gray-700 mb-4">
             Let&apos;s plan your retirement together
           </p>
+          <div className="mt-6 p-4 bg-yellow-50 border-2 border-yellow-300 rounded-lg max-w-3xl mx-auto">
+            <p className="text-sm text-gray-700">
+              ⚠️ <strong>Disclaimer:</strong> This is a sophisticated calculator for educational purposes only and should not be interpreted as financial advice. Please consult with a qualified financial advisor for personalized guidance.
+            </p>
+          </div>
         </header>
 
         {/* Main Form Card */}
@@ -440,6 +445,16 @@ export default function Home() {
                 )}
               </div>
 
+              {/* Information Box */}
+              <div className="pt-6 p-6 bg-blue-50 border-2 border-blue-200 rounded-xl">
+                <p className="text-lg text-gray-700 mb-3">
+                  <strong>Note:</strong> You don&apos;t need to enter your portfolio value—since withdrawals are percentage-based, the math works the same whether you have $100,000 or $10,000,000.
+                </p>
+                <p className="text-lg text-gray-700">
+                  <strong>Asset Classes:</strong> Stocks = S&P 500 Total Return, Bonds = 5-Year U.S. Treasury Total Return
+                </p>
+              </div>
+
               {/* Submit Button */}
               <div className="pt-6">
                 <button
@@ -508,7 +523,7 @@ export default function Home() {
                         <th className="p-4 text-lg font-bold text-gray-700 text-right">Successes</th>
                         <th className="p-4 text-lg font-bold text-gray-700 text-right">Failures</th>
                         <th className="p-4 text-lg font-bold text-gray-700 text-right">Median Years to Failure</th>
-                        <th className="p-4 text-lg font-bold text-gray-700 text-right">Avg Final Portfolio</th>
+                        <th className="p-4 text-lg font-bold text-gray-700 text-right">Avg Final Portfolio (When Successful)</th>
                       </tr>
                     </thead>
                     <tbody>

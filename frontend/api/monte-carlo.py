@@ -90,7 +90,7 @@ def load_historical_data():
     return df[['SP500_Return', 'Bond_Return', 'Inflation']].values
 
 
-def run_monte_carlo(years, withdrawal_rate, inflation_input, stock_allocation, bond_allocation, num_simulations=100):
+def run_monte_carlo(years, withdrawal_rate, inflation_input, stock_allocation, bond_allocation, num_simulations=1000):
     """
     Run Monte Carlo simulation using historical bootstrap
 
@@ -206,7 +206,7 @@ def run_monte_carlo(years, withdrawal_rate, inflation_input, stock_allocation, b
     }
 
 
-def run_allocation_sweep_analysis(years, withdrawal_rate, inflation_input, num_simulations=100):
+def run_allocation_sweep_analysis(years, withdrawal_rate, inflation_input, num_simulations=1000):
     """
     Run Monte Carlo simulations across different stock/bond allocations
 
