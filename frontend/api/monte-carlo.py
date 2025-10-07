@@ -26,9 +26,15 @@ class handler(BaseHTTPRequestHandler):
             inflation_input = request_data.get('inflation')  # None or number
             run_allocation_sweep = request_data.get('allocationSweep', False)
             run_stress_test = request_data.get('historicalStressTest', False)
+            find_optimal_allocation = request_data.get('findOptimalHistoricalAllocation', False)
 
-            # Run historical stress test, allocation sweep, or single simulation
-            if run_stress_test:
+            # Run historical stress test, optimal allocation finder, allocation sweep, or single simulation
+            if find_optimal_allocation:
+                result = find_optimal_historical_allocation(
+                    years=years,
+                    withdrawal_rate=withdrawal_rate
+                )
+            elif run_stress_test:
                 stock_allocation = request_data.get('stockAllocation', 70) / 100
                 bond_allocation = request_data.get('bondAllocation', 30) / 100
                 result = run_historical_stress_test(
@@ -370,6 +376,79 @@ def run_historical_stress_test(years, withdrawal_rate, stock_allocation, bond_al
         'failed': failed,
         'failureYear': failure_year,
         'yearlyResults': yearly_results
+    }
+
+
+def find_optimal_historical_allocation(years, withdrawal_rate):
+    """
+    Find the optimal allocation for the March 2000 stress test scenario
+
+    Tests all allocations from 0% to 100% stocks in 10% increments using
+    deterministic historical data from March 2000 onwards.
+
+    Returns the allocation with the highest final portfolio value (or lowest
+    failure year if all fail).
+    """
+
+    best_allocation = None
+    best_final_value = -1
+    best_survived_longest = 0
+    all_results = []
+
+    # Test each allocation from 0% to 100% stocks
+    for stock_pct in range(0, 101, 10):
+        stock_allocation = stock_pct / 100
+        bond_allocation = (100 - stock_pct) / 100
+
+        result = run_historical_stress_test(
+            years=years,
+            withdrawal_rate=withdrawal_rate,
+            stock_allocation=stock_allocation,
+            bond_allocation=bond_allocation
+        )
+
+        all_results.append({
+            'stockPercent': stock_pct,
+            'bondPercent': 100 - stock_pct,
+            'failed': result['failed'],
+            'failureYear': result['failureYear'],
+            'finalValue': result['yearlyResults'][-1]['portfolioValue'] if not result['failed'] else 0,
+            'yearsSurvived': len(result['yearlyResults']) - 1  # Subtract starting year
+        })
+
+        # Determine if this is the best allocation
+        # Prioritize: 1) Not failing, 2) Highest final value among survivors
+        if not result['failed']:
+            final_value = result['yearlyResults'][-1]['portfolioValue']
+            if final_value > best_final_value:
+                best_final_value = final_value
+                best_allocation = {
+                    'stockPercent': stock_pct,
+                    'bondPercent': 100 - stock_pct,
+                    'result': result
+                }
+        elif best_allocation is None:
+            # First allocation (all fail case), set as baseline
+            best_allocation = {
+                'stockPercent': stock_pct,
+                'bondPercent': 100 - stock_pct,
+                'result': result
+            }
+        elif best_allocation['result']['failed'] and result['failed']:
+            # Both failed, pick the one that survived longest
+            years_survived = len(result['yearlyResults']) - 1
+            best_years = len(best_allocation['result']['yearlyResults']) - 1
+            if years_survived > best_years:
+                best_allocation = {
+                    'stockPercent': stock_pct,
+                    'bondPercent': 100 - stock_pct,
+                    'result': result
+                }
+
+    return {
+        'type': 'optimalHistoricalAllocation',
+        'optimalAllocation': best_allocation,
+        'allAllocations': all_results
     }
 
 

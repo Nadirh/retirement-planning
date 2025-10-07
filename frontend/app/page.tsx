@@ -44,6 +44,23 @@ interface HistoricalStressTestResult {
   yearlyResults: YearlyResult[];
 }
 
+interface OptimalAllocationResult {
+  type: 'optimalHistoricalAllocation';
+  optimalAllocation: {
+    stockPercent: number;
+    bondPercent: number;
+    result: HistoricalStressTestResult;
+  };
+  allAllocations: Array<{
+    stockPercent: number;
+    bondPercent: number;
+    failed: boolean;
+    failureYear: number | null;
+    finalValue: number;
+    yearsSurvived: number;
+  }>;
+}
+
 export default function Home() {
   const [formData, setFormData] = useState({
     yearsInRetirement: '',
@@ -62,6 +79,7 @@ export default function Home() {
   const [isSimulating, setIsSimulating] = useState(false);
   const [sweepResults, setSweepResults] = useState<AllocationSweepResult | null>(null);
   const [stressTestResults, setStressTestResults] = useState<HistoricalStressTestResult | null>(null);
+  const [optimalAllocationResults, setOptimalAllocationResults] = useState<OptimalAllocationResult | null>(null);
   const [usedSpeechInput, setUsedSpeechInput] = useState(false);
   const [showStressTestPrompt, setShowStressTestPrompt] = useState(false);
 
@@ -256,28 +274,46 @@ export default function Home() {
 
     setIsSimulating(true);
     setStressTestResults(null);
+    setOptimalAllocationResults(null);
 
     try {
-      const response = await fetch('/api/monte-carlo', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          years: parseInt(formData.yearsInRetirement),
-          withdrawalRate: parseFloat(formData.withdrawalRate),
-          stockAllocation: sweepResults.bestAllocation.stockPercent,
-          bondAllocation: sweepResults.bestAllocation.bondPercent,
-          historicalStressTest: true,
+      // Run both the stress test with Monte Carlo best allocation AND find optimal March 2000 allocation
+      const [stressResponse, optimalResponse] = await Promise.all([
+        fetch('/api/monte-carlo', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            years: parseInt(formData.yearsInRetirement),
+            withdrawalRate: parseFloat(formData.withdrawalRate),
+            stockAllocation: sweepResults.bestAllocation.stockPercent,
+            bondAllocation: sweepResults.bestAllocation.bondPercent,
+            historicalStressTest: true,
+          }),
         }),
-      });
+        fetch('/api/monte-carlo', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            years: parseInt(formData.yearsInRetirement),
+            withdrawalRate: parseFloat(formData.withdrawalRate),
+            findOptimalHistoricalAllocation: true,
+          }),
+        }),
+      ]);
 
-      if (!response.ok) {
+      if (!stressResponse.ok || !optimalResponse.ok) {
         throw new Error('Historical stress test failed');
       }
 
-      const data: HistoricalStressTestResult = await response.json();
-      setStressTestResults(data);
+      const stressData: HistoricalStressTestResult = await stressResponse.json();
+      const optimalData: OptimalAllocationResult = await optimalResponse.json();
+
+      setStressTestResults(stressData);
+      setOptimalAllocationResults(optimalData);
       setShowStressTestPrompt(false); // Hide the prompt after running
     } catch (error) {
       console.error('Historical stress test error:', error);
@@ -580,7 +616,7 @@ export default function Home() {
                         <th className="p-4 text-lg font-bold text-gray-700 text-right">Success Rate</th>
                         <th className="p-4 text-lg font-bold text-gray-700 text-right">Successes</th>
                         <th className="p-4 text-lg font-bold text-gray-700 text-right">Failures</th>
-                        <th className="p-4 text-lg font-bold text-gray-700 text-right">Median Years to Failure</th>
+                        <th className="p-4 text-lg font-bold text-gray-700 text-right">Median Years to Failure (if failure)</th>
                         <th className="p-4 text-lg font-bold text-gray-700 text-right">Avg Final Portfolio (When Successful)</th>
                       </tr>
                     </thead>
@@ -720,8 +756,9 @@ export default function Home() {
 
                 {/* Simple Line Chart */}
                 <div className="mb-8 p-6 bg-gray-50 rounded-xl">
-                  <div className="relative h-64">
-                    <svg className="w-full h-full" viewBox="0 0 800 200" preserveAspectRatio="none">
+                  <h3 className="text-xl font-bold text-gray-900 mb-4">Portfolio Value Over Time</h3>
+                  <div className="relative h-80 pl-16 pb-12">
+                    <svg className="w-full h-full" viewBox="0 0 800 240" preserveAspectRatio="none">
                       {/* Grid lines */}
                       <line x1="0" y1="0" x2="0" y2="200" stroke="#e5e7eb" strokeWidth="1" />
                       <line x1="0" y1="200" x2="800" y2="200" stroke="#e5e7eb" strokeWidth="2" />
@@ -754,11 +791,18 @@ export default function Home() {
                           />
                         );
                       })}
+
+                      {/* Y-axis label */}
+                      <text x="-100" y="15" transform="rotate(-90)" fontSize="14" fill="#374151" textAnchor="middle" fontWeight="bold">
+                        Portfolio Value ($)
+                      </text>
+
+                      {/* X-axis label */}
+                      <text x="400" y="235" fontSize="14" fill="#374151" textAnchor="middle" fontWeight="bold">
+                        Year
+                      </text>
                     </svg>
                   </div>
-                  <p className="text-sm text-gray-600 text-center mt-4">
-                    Orange line shows portfolio value from {stressTestResults.startDate} onwards
-                  </p>
                 </div>
 
                 {/* Data Table */}
@@ -800,6 +844,168 @@ export default function Home() {
                     <li>Starting portfolio of $1,000,000 is used as an example for illustration</li>
                     <li>March 2000 was the dot-com bubble peak (S&P 500 peaked March 24, 2000), followed by both the dot-com crash (2000-2002) and financial crisis (2008-2009)</li>
                   </ul>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Optimal March 2000 Allocation Results */}
+          {optimalAllocationResults && !isSimulating && (
+            <div className="mt-8 bg-white border-4 border-blue-500 rounded-2xl shadow-xl overflow-hidden" role="region" aria-label="Optimal March 2000 Allocation Results">
+              {/* Header */}
+              <div className="bg-gradient-to-r from-blue-600 to-indigo-600 p-8 text-white">
+                <h2 className="text-3xl font-bold mb-3">
+                  🎯 Optimal Allocation for March 2000 Retirement
+                </h2>
+                <p className="text-xl opacity-90">
+                  What allocation would have worked best if you retired at the dot-com peak?
+                </p>
+              </div>
+
+              {/* Optimal Allocation Summary */}
+              <div className="p-8 bg-blue-50 border-b-4 border-blue-500">
+                <div className="text-center">
+                  <p className="text-4xl font-bold text-blue-700 mb-4">
+                    {optimalAllocationResults.optimalAllocation.stockPercent}% Stocks / {optimalAllocationResults.optimalAllocation.bondPercent}% Bonds
+                  </p>
+                  <p className="text-xl text-gray-700 mb-2">
+                    {optimalAllocationResults.optimalAllocation.result.failed ? (
+                      <>Portfolio would have failed in {optimalAllocationResults.optimalAllocation.result.failureYear} (best survival among all allocations)</>
+                    ) : (
+                      <>Portfolio would have survived with ${optimalAllocationResults.optimalAllocation.result.yearlyResults[optimalAllocationResults.optimalAllocation.result.yearlyResults.length - 1].portfolioValue.toLocaleString('en-US', { maximumFractionDigits: 0 })} remaining</>
+                    )}
+                  </p>
+                  <p className="text-lg text-gray-600 italic">
+                    Compare this to the Monte Carlo optimal: {sweepResults?.bestAllocation.stockPercent}% stocks / {sweepResults?.bestAllocation.bondPercent}% bonds
+                  </p>
+                </div>
+              </div>
+
+              {/* Results Table and Chart */}
+              <div className="p-8">
+                <h3 className="text-2xl font-bold text-gray-900 mb-6">
+                  Year-by-Year Portfolio Value (Optimal {optimalAllocationResults.optimalAllocation.stockPercent}/{optimalAllocationResults.optimalAllocation.bondPercent} Allocation)
+                </h3>
+
+                {/* Chart */}
+                <div className="mb-8 p-6 bg-gray-50 rounded-xl">
+                  <h3 className="text-xl font-bold text-gray-900 mb-4">Portfolio Value Over Time</h3>
+                  <div className="relative h-80 pl-16 pb-12">
+                    <svg className="w-full h-full" viewBox="0 0 800 240" preserveAspectRatio="none">
+                      {/* Grid lines */}
+                      <line x1="0" y1="0" x2="0" y2="200" stroke="#e5e7eb" strokeWidth="1" />
+                      <line x1="0" y1="200" x2="800" y2="200" stroke="#e5e7eb" strokeWidth="2" />
+
+                      {/* Portfolio value line */}
+                      <polyline
+                        points={optimalAllocationResults.optimalAllocation.result.yearlyResults.map((result, idx) => {
+                          const x = (idx / (optimalAllocationResults.optimalAllocation.result.yearlyResults.length - 1)) * 800;
+                          const maxValue = Math.max(...optimalAllocationResults.optimalAllocation.result.yearlyResults.map(r => r.portfolioValue));
+                          const y = 200 - ((result.portfolioValue / maxValue) * 180);
+                          return `${x},${y}`;
+                        }).join(' ')}
+                        fill="none"
+                        stroke="#2563eb"
+                        strokeWidth="3"
+                      />
+
+                      {/* Data points */}
+                      {optimalAllocationResults.optimalAllocation.result.yearlyResults.map((result, idx) => {
+                        const x = (idx / (optimalAllocationResults.optimalAllocation.result.yearlyResults.length - 1)) * 800;
+                        const maxValue = Math.max(...optimalAllocationResults.optimalAllocation.result.yearlyResults.map(r => r.portfolioValue));
+                        const y = 200 - ((result.portfolioValue / maxValue) * 180);
+                        return (
+                          <circle
+                            key={idx}
+                            cx={x}
+                            cy={y}
+                            r="4"
+                            fill="#2563eb"
+                          />
+                        );
+                      })}
+
+                      {/* Y-axis label */}
+                      <text x="-100" y="15" transform="rotate(-90)" fontSize="14" fill="#374151" textAnchor="middle" fontWeight="bold">
+                        Portfolio Value ($)
+                      </text>
+
+                      {/* X-axis label */}
+                      <text x="400" y="235" fontSize="14" fill="#374151" textAnchor="middle" fontWeight="bold">
+                        Year
+                      </text>
+                    </svg>
+                  </div>
+                </div>
+
+                {/* Data Table */}
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr className="bg-gray-100 border-b-2 border-gray-300">
+                        <th className="p-4 text-lg font-bold text-gray-700">Date</th>
+                        <th className="p-4 text-lg font-bold text-gray-700 text-right">Portfolio Value</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {optimalAllocationResults.optimalAllocation.result.yearlyResults.map((result, idx) => (
+                        <tr
+                          key={idx}
+                          className={`border-b border-gray-200 hover:bg-gray-50 transition-colors ${
+                            idx === 0 ? 'bg-blue-50' : ''
+                          } ${idx === optimalAllocationResults.optimalAllocation.result.yearlyResults.length - 1 && !optimalAllocationResults.optimalAllocation.result.failed ? 'bg-green-50' : ''}`}
+                        >
+                          <td className="p-4 text-lg font-semibold">{result.date}</td>
+                          <td className="p-4 text-xl text-right font-mono">
+                            ${result.portfolioValue.toLocaleString('en-US', { maximumFractionDigits: 0 })}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* All Allocations Comparison */}
+                <div className="mt-8 p-6 bg-gray-100 rounded-lg">
+                  <p className="font-semibold mb-4 text-lg">📊 All Tested Allocations for March 2000:</p>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                    {optimalAllocationResults.allAllocations.map((alloc, idx) => (
+                      <div
+                        key={idx}
+                        className={`p-3 rounded-lg border-2 ${
+                          alloc.stockPercent === optimalAllocationResults.optimalAllocation.stockPercent
+                            ? 'bg-blue-100 border-blue-500 font-bold'
+                            : alloc.failed
+                            ? 'bg-red-50 border-red-300'
+                            : 'bg-green-50 border-green-300'
+                        }`}
+                      >
+                        <div className="text-sm font-semibold">
+                          {alloc.stockPercent}% / {alloc.bondPercent}%
+                        </div>
+                        <div className="text-xs text-gray-600">
+                          {alloc.failed ? (
+                            <>Failed {alloc.failureYear}</>
+                          ) : (
+                            <>Final: ${(alloc.finalValue / 1000).toFixed(0)}K</>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Key Insight */}
+                <div className="mt-8 p-6 bg-yellow-50 border-l-4 border-yellow-400 rounded-lg">
+                  <p className="font-bold text-lg text-gray-900 mb-2">💡 Key Insight:</p>
+                  <p className="text-gray-700">
+                    The optimal allocation for the March 2000 scenario ({optimalAllocationResults.optimalAllocation.stockPercent}% stocks) is
+                    {sweepResults && optimalAllocationResults.optimalAllocation.stockPercent < sweepResults.bestAllocation.stockPercent ? (
+                      <> <strong>more conservative</strong> than the Monte Carlo optimal ({sweepResults.bestAllocation.stockPercent}% stocks). This shows how sequence of returns risk matters—the allocation that works best historically may differ from what performs best across random scenarios.</>
+                    ) : (
+                      <> different from the Monte Carlo optimal ({sweepResults?.bestAllocation.stockPercent}% stocks), demonstrating the importance of considering specific historical scenarios.</>
+                    )}
+                  </p>
                 </div>
               </div>
             </div>
