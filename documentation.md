@@ -855,6 +855,40 @@ if portfolio_value <= 0:
 
 ## Change Log
 
+### 2025-10-07 - Allocation Sweep & Historical Stress Test Complete ✅
+- ✅ **Allocation Sweep Analysis**: Tests 11 allocations (0% to 100% stocks in 10% increments)
+  - Runs 1,000 Monte Carlo simulations per allocation (11,000 total)
+  - Displays success rate for each allocation in color-coded table
+  - Identifies optimal allocation for user's parameters
+  - Shows median years to failure and average final portfolio for each allocation
+- ✅ **Historical Stress Test**: Deterministic simulation using March 2000 data (dot-com peak)
+  - Uses actual historical returns from worst 10-year period
+  - Shows year-by-year portfolio values from March 2000 through December 2024
+  - Uses real inflation data to adjust withdrawals
+  - Displays portfolio failure scenarios realistically
+  - Tested with March 2000 (dot-com peak), changed from March 2004 for better demonstration
+- ✅ **Optimal March 2000 Allocation Finder**: Deterministic search for best allocation
+  - Tests all 11 allocations using actual March 2000 historical data
+  - Finds allocation with highest final value (or best survival if all fail)
+  - Displays optimal allocation with full graph and yearly table
+  - Compares Monte Carlo optimal vs March 2000 optimal (e.g., 90/10 vs 40/60)
+  - Shows all 11 allocations in comparison grid
+  - Demonstrates sequence of returns risk impact
+- ✅ **UI Improvements**:
+  - Added withdrawal rate inflation note: "This withdrawal amount will then increase at the rate of inflation."
+  - Added numeric axis values to graphs (Y-axis: $0K, $250K, etc., X-axis: 2000, 2004, etc.)
+  - Fixed graph viewBox to prevent clipping of labels
+  - Larger charts with gridlines for better readability
+  - Updated table header: "Median Years to Failure (if failure)"
+- ✅ **Performance Optimization**:
+  - Runs stress test and optimal allocation search in parallel using `Promise.all()`
+  - Both complete simultaneously for faster user experience
+- ✅ **March 2000 Data Validation**:
+  - Verified worst 10-year period: March 1999 - February 2009 (-29.48% total)
+  - Used March 2000 as more intuitive (actual dot-com peak: March 24, 2000)
+  - Tested scenarios showing portfolio failures (e.g., 6% withdrawal fails in 2015)
+  - Includes both dot-com crash (2000-2002) and financial crisis (2008-2009)
+
 ### 2025-10-07 - Monte Carlo Simulation Complete ✅
 - ✅ Implemented historical bootstrap Monte Carlo engine
 - ✅ Created Python serverless API (`/api/monte-carlo.py`)
@@ -905,5 +939,41 @@ if portfolio_value <= 0:
 ---
 
 **Last Updated:** October 7, 2025
-**Current Version:** 0.2.0 (Monte Carlo Simulation)
-**Status:** ✅ Phase 1 & 2 Complete - Production Ready
+**Current Version:** 0.3.0 (Allocation Sweep + Historical Stress Test + Optimal Allocation Finder)
+**Status:** ✅ Phase 1, 2 & 3 Complete - Production Ready
+
+---
+
+## For Tomorrow's Session
+
+When starting the next session, you should:
+
+1. **Read these files first**:
+   - `prd.md` - Product requirements and vision
+   - `ARCHITECTURE.md` - Technical architecture and design principles
+   - `documentation.md` - This file (current implementation status)
+
+2. **Current state summary**:
+   - ✅ Basic Monte Carlo simulation working (100 iterations, 2 seconds)
+   - ✅ Allocation sweep (11 allocations × 1,000 simulations = 11,000 total)
+   - ✅ Historical stress test using March 2000 dot-com peak data
+   - ✅ Optimal allocation finder for March 2000 scenario
+   - ✅ Beautiful graphs with axis labels and gridlines
+   - ✅ All deployed and working on Vercel
+
+3. **What's next** (potential priorities):
+   - Add more customization (user-selectable allocations beyond 70/30)
+   - Improve Monte Carlo iterations (1,000-10,000 for more accuracy)
+   - Add efficient frontier visualization
+   - Add data persistence (Supabase integration)
+   - Add more historical stress test scenarios (different start dates)
+   - Optimize performance (caching, web workers)
+
+4. **Key technical details**:
+   - Everything runs on Vercel (Next.js frontend + Python API)
+   - Historical data: 443 months (1988-2024) in `/frontend/data/monthly_returns.csv`
+   - Bootstrap sampling preserves stock/bond/inflation correlations
+   - No rebalancing assumed in simulations
+   - March 2000 = dot-com peak (worst 10-year period for demonstration)
+
+5. **No action needed** unless user requests something specific - just be ready to continue from where we are!
