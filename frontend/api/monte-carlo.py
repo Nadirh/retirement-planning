@@ -25,9 +25,19 @@ class handler(BaseHTTPRequestHandler):
             withdrawal_rate = request_data.get('withdrawalRate', 5.0) / 100  # Convert to decimal
             inflation_input = request_data.get('inflation')  # None or number
             run_allocation_sweep = request_data.get('allocationSweep', False)
+            run_stress_test = request_data.get('historicalStressTest', False)
 
-            # Run allocation sweep or single simulation
-            if run_allocation_sweep:
+            # Run historical stress test, allocation sweep, or single simulation
+            if run_stress_test:
+                stock_allocation = request_data.get('stockAllocation', 70) / 100
+                bond_allocation = request_data.get('bondAllocation', 30) / 100
+                result = run_historical_stress_test(
+                    years=years,
+                    withdrawal_rate=withdrawal_rate,
+                    stock_allocation=stock_allocation,
+                    bond_allocation=bond_allocation
+                )
+            elif run_allocation_sweep:
                 result = run_allocation_sweep_analysis(
                     years=years,
                     withdrawal_rate=withdrawal_rate,
@@ -203,6 +213,152 @@ def run_monte_carlo(years, withdrawal_rate, inflation_input, stock_allocation, b
             'medianYearsToFailure': round(median_years_to_failure, 1) if median_years_to_failure else None,
             'usedBootstrap': use_bootstrap_inflation
         }
+    }
+
+
+def run_historical_stress_test(years, withdrawal_rate, stock_allocation, bond_allocation):
+    """
+    Run a deterministic historical simulation starting October 2007
+
+    This simulates the worst time to retire (right before 2008 financial crisis)
+    using actual historical data from October 2007 through December 2024.
+
+    Parameters:
+    - years: Number of years in retirement (if ≤17, stop at Oct 2024; if ≥18, stop at Dec 2024)
+    - withdrawal_rate: Annual withdrawal as % of portfolio (decimal)
+    - stock_allocation: % in stocks (decimal)
+    - bond_allocation: % in bonds (decimal)
+
+    Returns:
+    - Dictionary with year-by-year portfolio values
+    """
+
+    # Load historical data
+    historical_data = load_historical_data()
+    df = pd.read_csv(Path(__file__).parent.parent / 'data' / 'monthly_returns.csv')
+    df['Date'] = pd.to_datetime(df['Date'])
+
+    # Filter data from October 2007 onwards
+    start_date = pd.to_datetime('2007-10-31')
+    historical_subset = df[df['Date'] >= start_date].reset_index(drop=True)
+
+    # Determine end date based on years
+    if years <= 17:
+        # Stop at October 2024 (17 years after Oct 2007)
+        max_months = years * 12
+        end_year = 2024
+        end_month = 10
+    else:
+        # Stop at December 2024
+        max_months = min(years * 12, len(historical_subset))
+        end_year = 2024
+        end_month = 12
+
+    # Initial portfolio
+    initial_portfolio = 1_000_000
+    portfolio = initial_portfolio
+    monthly_withdrawal = initial_portfolio * withdrawal_rate / 12
+
+    # Track results by year (October to October, then final Dec 2024)
+    yearly_results = []
+    failed = False
+    failure_year = None
+
+    # Add starting value
+    yearly_results.append({
+        'date': 'October 2007',
+        'portfolioValue': initial_portfolio,
+        'year': 2007
+    })
+
+    # Run simulation month by month
+    for month_idx in range(min(max_months, len(historical_subset))):
+        row = historical_subset.iloc[month_idx]
+
+        # Get returns (convert percentages to decimals)
+        stock_return = row['SP500_Total_Return'] / 100
+        bond_return = row['Treasury_5Y_Total_Return'] / 100
+        monthly_inflation = row['Inflation_Monthly'] / 100
+
+        # Apply returns to portfolio
+        stock_value = portfolio * stock_allocation * (1 + stock_return)
+        bond_value = portfolio * bond_allocation * (1 + bond_return)
+        portfolio = stock_value + bond_value
+
+        # Withdraw
+        portfolio -= monthly_withdrawal
+
+        # Adjust withdrawal for inflation (annually)
+        if (month_idx + 1) % 12 == 0:
+            # Compound the inflation over the past 12 months
+            annual_inflation = 1.0
+            for i in range(12):
+                past_month = historical_subset.iloc[month_idx - 11 + i]
+                annual_inflation *= (1 + past_month['Inflation_Monthly'] / 100)
+            monthly_withdrawal *= annual_inflation
+
+        # Check for failure
+        if portfolio <= 0:
+            failed = True
+            failure_year = row['Date'].year
+            break
+
+        # Record October values each year (skip the starting October 2007)
+        current_date = row['Date']
+        if current_date.month == 10 and current_date.year > 2007:
+            yearly_results.append({
+                'date': f"October {current_date.year}",
+                'portfolioValue': portfolio,
+                'year': current_date.year
+            })
+
+    # Add final December 2024 value if portfolio still exists and years >= 18
+    if not failed and years >= 18:
+        # Continue to December 2024
+        dec_2024_data = historical_subset[historical_subset['Date'] <= '2024-12-31']
+        remaining_months = len(dec_2024_data) - max_months
+
+        for month_idx in range(max_months, len(dec_2024_data)):
+            row = historical_subset.iloc[month_idx]
+
+            stock_return = row['SP500_Total_Return'] / 100
+            bond_return = row['Treasury_5Y_Total_Return'] / 100
+
+            stock_value = portfolio * stock_allocation * (1 + stock_return)
+            bond_value = portfolio * bond_allocation * (1 + bond_return)
+            portfolio = stock_value + bond_value
+            portfolio -= monthly_withdrawal
+
+            if (month_idx + 1) % 12 == 0:
+                annual_inflation = 1.0
+                for i in range(12):
+                    past_month = historical_subset.iloc[month_idx - 11 + i]
+                    annual_inflation *= (1 + past_month['Inflation_Monthly'] / 100)
+                monthly_withdrawal *= annual_inflation
+
+            if portfolio <= 0:
+                failed = True
+                failure_year = row['Date'].year
+                break
+
+        if not failed:
+            yearly_results.append({
+                'date': 'December 2024',
+                'portfolioValue': portfolio,
+                'year': 2024
+            })
+
+    return {
+        'type': 'historicalStressTest',
+        'startDate': 'October 2007',
+        'yearsSimulated': years,
+        'initialPortfolio': initial_portfolio,
+        'stockAllocation': stock_allocation * 100,
+        'bondAllocation': bond_allocation * 100,
+        'withdrawalRate': withdrawal_rate * 100,
+        'failed': failed,
+        'failureYear': failure_year,
+        'yearlyResults': yearly_results
     }
 
 

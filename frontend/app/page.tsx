@@ -25,6 +25,25 @@ interface AllocationSweepResult {
   totalSimulations: number;
 }
 
+interface YearlyResult {
+  date: string;
+  portfolioValue: number;
+  year: number;
+}
+
+interface HistoricalStressTestResult {
+  type: 'historicalStressTest';
+  startDate: string;
+  yearsSimulated: number;
+  initialPortfolio: number;
+  stockAllocation: number;
+  bondAllocation: number;
+  withdrawalRate: number;
+  failed: boolean;
+  failureYear: number | null;
+  yearlyResults: YearlyResult[];
+}
+
 export default function Home() {
   const [formData, setFormData] = useState({
     yearsInRetirement: '',
@@ -42,7 +61,9 @@ export default function Home() {
   const [isListening, setIsListening] = useState<string | null>(null);
   const [isSimulating, setIsSimulating] = useState(false);
   const [sweepResults, setSweepResults] = useState<AllocationSweepResult | null>(null);
+  const [stressTestResults, setStressTestResults] = useState<HistoricalStressTestResult | null>(null);
   const [usedSpeechInput, setUsedSpeechInput] = useState(false);
+  const [showStressTestPrompt, setShowStressTestPrompt] = useState(false);
 
   // Text-to-speech function with female voice
   const speak = (text: string) => {
@@ -216,6 +237,7 @@ export default function Home() {
 
       const data: AllocationSweepResult = await response.json();
       setSweepResults(data);
+      setShowStressTestPrompt(true); // Show the stress test option
 
       // Announce results for screen readers only if user used speech input
       if (usedSpeechInput) {
@@ -224,6 +246,42 @@ export default function Home() {
     } catch (error) {
       console.error('Allocation sweep error:', error);
       alert('Sorry, the allocation sweep failed. Please try again.');
+    } finally {
+      setIsSimulating(false);
+    }
+  };
+
+  const handleStressTest = async () => {
+    if (!sweepResults) return;
+
+    setIsSimulating(true);
+    setStressTestResults(null);
+
+    try {
+      const response = await fetch('/api/monte-carlo', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          years: parseInt(formData.yearsInRetirement),
+          withdrawalRate: parseFloat(formData.withdrawalRate),
+          stockAllocation: sweepResults.bestAllocation.stockPercent,
+          bondAllocation: sweepResults.bestAllocation.bondPercent,
+          historicalStressTest: true,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Historical stress test failed');
+      }
+
+      const data: HistoricalStressTestResult = await response.json();
+      setStressTestResults(data);
+      setShowStressTestPrompt(false); // Hide the prompt after running
+    } catch (error) {
+      console.error('Historical stress test error:', error);
+      alert('Sorry, the historical stress test failed. Please try again.');
     } finally {
       setIsSimulating(false);
     }
@@ -577,6 +635,25 @@ export default function Home() {
                   </ul>
                 </div>
 
+                {/* Historical Stress Test Prompt */}
+                {showStressTestPrompt && (
+                  <div className="mt-8 p-6 bg-orange-50 border-2 border-orange-300 rounded-xl">
+                    <h3 className="text-2xl font-bold text-gray-900 mb-3">
+                      📉 Want to see the worst-case scenario?
+                    </h3>
+                    <p className="text-lg text-gray-700 mb-4">
+                      See how your optimal allocation ({sweepResults.bestAllocation.stockPercent}% stocks / {sweepResults.bestAllocation.bondPercent}% bonds) would have performed if you retired in <strong>October 2007</strong>—right before the 2008 Financial Crisis (the worst time to retire in modern history).
+                    </p>
+                    <button
+                      onClick={handleStressTest}
+                      disabled={isSimulating}
+                      className="w-full py-4 px-6 text-xl font-semibold text-white bg-orange-600 rounded-lg hover:bg-orange-700 focus:outline-none focus:ring-4 focus:ring-orange-500 focus:ring-offset-2 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
+                    >
+                      {isSimulating ? 'Running Stress Test...' : 'Yes, Show Me the Historical Stress Test'}
+                    </button>
+                  </div>
+                )}
+
                 {/* Run Again Button */}
                 <div className="mt-8 text-center">
                   <button
@@ -588,6 +665,140 @@ export default function Home() {
                   >
                     Adjust Parameters & Run Again
                   </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Historical Stress Test Results */}
+          {stressTestResults && !isSimulating && (
+            <div className="mt-8 bg-white border-4 border-orange-500 rounded-2xl shadow-xl overflow-hidden" role="region" aria-label="Historical Stress Test Results">
+              {/* Header */}
+              <div className="bg-gradient-to-r from-orange-600 to-red-600 p-8 text-white">
+                <h2 className="text-3xl font-bold mb-3">
+                  📉 Historical Stress Test: October 2007 Retirement
+                </h2>
+                <p className="text-xl opacity-90">
+                  This shows how your portfolio would have performed retiring right before the 2008 Financial Crisis
+                </p>
+              </div>
+
+              {/* Summary Box */}
+              <div className={`p-8 ${stressTestResults.failed ? 'bg-red-50 border-b-4 border-red-500' : 'bg-green-50 border-b-4 border-green-500'}`}>
+                <div className="text-center">
+                  <p className="text-2xl font-semibold text-gray-700 mb-2">
+                    Allocation: {stressTestResults.stockAllocation}% Stocks / {stressTestResults.bondAllocation}% Bonds
+                  </p>
+                  <p className="text-xl text-gray-600 mb-4">
+                    Starting Portfolio: ${stressTestResults.initialPortfolio.toLocaleString()} (example for illustration)
+                  </p>
+                  {stressTestResults.failed ? (
+                    <div>
+                      <p className="text-4xl font-bold text-red-700 mb-2">
+                        ❌ Portfolio Depleted
+                      </p>
+                      <p className="text-2xl text-red-600">
+                        Ran out of money in {stressTestResults.failureYear}
+                      </p>
+                    </div>
+                  ) : (
+                    <div>
+                      <p className="text-4xl font-bold text-green-700 mb-2">
+                        ✅ Portfolio Survived
+                      </p>
+                      <p className="text-2xl text-green-600">
+                        Final Value: ${stressTestResults.yearlyResults[stressTestResults.yearlyResults.length - 1].portfolioValue.toLocaleString('en-US', { maximumFractionDigits: 0 })}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Results Table and Chart */}
+              <div className="p-8">
+                <h3 className="text-2xl font-bold text-gray-900 mb-6">Year-by-Year Portfolio Value</h3>
+
+                {/* Simple Line Chart */}
+                <div className="mb-8 p-6 bg-gray-50 rounded-xl">
+                  <div className="relative h-64">
+                    <svg className="w-full h-full" viewBox="0 0 800 200" preserveAspectRatio="none">
+                      {/* Grid lines */}
+                      <line x1="0" y1="0" x2="0" y2="200" stroke="#e5e7eb" strokeWidth="1" />
+                      <line x1="0" y1="200" x2="800" y2="200" stroke="#e5e7eb" strokeWidth="2" />
+
+                      {/* Portfolio value line */}
+                      <polyline
+                        points={stressTestResults.yearlyResults.map((result, idx) => {
+                          const x = (idx / (stressTestResults.yearlyResults.length - 1)) * 800;
+                          const maxValue = Math.max(...stressTestResults.yearlyResults.map(r => r.portfolioValue));
+                          const y = 200 - ((result.portfolioValue / maxValue) * 180);
+                          return `${x},${y}`;
+                        }).join(' ')}
+                        fill="none"
+                        stroke="#ea580c"
+                        strokeWidth="3"
+                      />
+
+                      {/* Data points */}
+                      {stressTestResults.yearlyResults.map((result, idx) => {
+                        const x = (idx / (stressTestResults.yearlyResults.length - 1)) * 800;
+                        const maxValue = Math.max(...stressTestResults.yearlyResults.map(r => r.portfolioValue));
+                        const y = 200 - ((result.portfolioValue / maxValue) * 180);
+                        return (
+                          <circle
+                            key={idx}
+                            cx={x}
+                            cy={y}
+                            r="4"
+                            fill="#ea580c"
+                          />
+                        );
+                      })}
+                    </svg>
+                  </div>
+                  <p className="text-sm text-gray-600 text-center mt-4">
+                    Orange line shows portfolio value from October 2007 onwards
+                  </p>
+                </div>
+
+                {/* Data Table */}
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr className="bg-gray-100 border-b-2 border-gray-300">
+                        <th className="p-4 text-lg font-bold text-gray-700">Date</th>
+                        <th className="p-4 text-lg font-bold text-gray-700 text-right">Portfolio Value</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {stressTestResults.yearlyResults.map((result, idx) => (
+                        <tr
+                          key={idx}
+                          className={`border-b border-gray-200 hover:bg-gray-50 transition-colors ${
+                            idx === 0 ? 'bg-blue-50' : ''
+                          } ${idx === stressTestResults.yearlyResults.length - 1 && !stressTestResults.failed ? 'bg-green-50' : ''}`}
+                        >
+                          <td className="p-4 text-lg font-semibold">{result.date}</td>
+                          <td className="p-4 text-xl text-right font-mono">
+                            ${result.portfolioValue.toLocaleString('en-US', { maximumFractionDigits: 0 })}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Context */}
+                <div className="mt-8 p-6 bg-gray-100 rounded-lg text-sm text-gray-700">
+                  <p className="font-semibold mb-2">🎯 What This Shows:</p>
+                  <ul className="list-disc list-inside space-y-1">
+                    <li>This is a deterministic simulation using actual historical data</li>
+                    <li>Uses real S&P 500 and 5-Year Treasury returns from October 2007 onwards</li>
+                    <li>Uses actual historical inflation to adjust withdrawals</li>
+                    <li>Withdrawal rate: {stressTestResults.withdrawalRate.toFixed(1)}% annually</li>
+                    <li>No portfolio rebalancing</li>
+                    <li>Starting portfolio of $1,000,000 is used as an example for illustration</li>
+                  </ul>
                 </div>
               </div>
             </div>
