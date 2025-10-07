@@ -413,9 +413,13 @@ export default function Home() {
                   className="block text-2xl font-semibold text-gray-900 mb-3"
                 >
                   2. How much would you like to withdraw in year 1 as a percentage of your total portfolio?
+                  <br />
+                  <span className="text-lg font-normal text-gray-600">
+                    This withdrawal amount will then increase at the rate of inflation.
+                  </span>
                   <button
                     type="button"
-                    onClick={() => speak('How much would you like to withdraw in year 1 as a percentage of your total portfolio? Enter a percentage between 0.1 and 20. This is the amount you will withdraw in the first year, and it will adjust with inflation each year after.')}
+                    onClick={() => speak('How much would you like to withdraw in year 1 as a percentage of your total portfolio? This withdrawal amount will then increase at the rate of inflation. Enter a percentage between 0.1 and 20.')}
                     className="ml-3 inline-flex items-center justify-center w-10 h-10 rounded-full bg-blue-100 text-blue-600 hover:bg-blue-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
                     aria-label="Read question aloud"
                     title="Listen to this question"
@@ -757,50 +761,86 @@ export default function Home() {
                 {/* Simple Line Chart */}
                 <div className="mb-8 p-6 bg-gray-50 rounded-xl">
                   <h3 className="text-xl font-bold text-gray-900 mb-4">Portfolio Value Over Time</h3>
-                  <div className="relative h-80 pl-16 pb-12">
-                    <svg className="w-full h-full" viewBox="0 0 800 240" preserveAspectRatio="none">
-                      {/* Grid lines */}
-                      <line x1="0" y1="0" x2="0" y2="200" stroke="#e5e7eb" strokeWidth="1" />
-                      <line x1="0" y1="200" x2="800" y2="200" stroke="#e5e7eb" strokeWidth="2" />
-
-                      {/* Portfolio value line */}
-                      <polyline
-                        points={stressTestResults.yearlyResults.map((result, idx) => {
-                          const x = (idx / (stressTestResults.yearlyResults.length - 1)) * 800;
-                          const maxValue = Math.max(...stressTestResults.yearlyResults.map(r => r.portfolioValue));
-                          const y = 200 - ((result.portfolioValue / maxValue) * 180);
-                          return `${x},${y}`;
-                        }).join(' ')}
-                        fill="none"
-                        stroke="#ea580c"
-                        strokeWidth="3"
-                      />
-
-                      {/* Data points */}
-                      {stressTestResults.yearlyResults.map((result, idx) => {
-                        const x = (idx / (stressTestResults.yearlyResults.length - 1)) * 800;
+                  <div className="relative h-96 pl-24 pb-16">
+                    <svg className="w-full h-full" viewBox="0 0 900 300" preserveAspectRatio="none">
+                      {/* Define constants */}
+                      {(() => {
                         const maxValue = Math.max(...stressTestResults.yearlyResults.map(r => r.portfolioValue));
-                        const y = 200 - ((result.portfolioValue / maxValue) * 180);
+                        const minValue = Math.min(...stressTestResults.yearlyResults.map(r => r.portfolioValue));
+                        const chartWidth = 800;
+                        const chartHeight = 220;
+                        const startYear = stressTestResults.yearlyResults[0].year;
+                        const endYear = stressTestResults.yearlyResults[stressTestResults.yearlyResults.length - 1].year;
+
                         return (
-                          <circle
-                            key={idx}
-                            cx={x}
-                            cy={y}
-                            r="4"
-                            fill="#ea580c"
-                          />
+                          <>
+                            {/* Grid lines and Y-axis values */}
+                            {[0, 0.25, 0.5, 0.75, 1].map((fraction) => {
+                              const yPos = chartHeight - (fraction * chartHeight);
+                              const value = minValue + (maxValue - minValue) * fraction;
+                              return (
+                                <g key={fraction}>
+                                  <line x1="0" y1={yPos} x2={chartWidth} y2={yPos} stroke="#e5e7eb" strokeWidth="1" strokeDasharray="4,4" />
+                                  <text x="-10" y={yPos + 5} fontSize="12" fill="#374151" textAnchor="end">
+                                    ${(value / 1000).toFixed(0)}K
+                                  </text>
+                                </g>
+                              );
+                            })}
+
+                            {/* X-axis gridlines and values */}
+                            {stressTestResults.yearlyResults.filter((_, idx) => idx % Math.ceil(stressTestResults.yearlyResults.length / 8) === 0 || idx === stressTestResults.yearlyResults.length - 1).map((result, idx, filtered) => {
+                              const actualIdx = stressTestResults.yearlyResults.indexOf(result);
+                              const x = (actualIdx / (stressTestResults.yearlyResults.length - 1)) * chartWidth;
+                              return (
+                                <g key={actualIdx}>
+                                  <line x1={x} y1="0" x2={x} y2={chartHeight} stroke="#e5e7eb" strokeWidth="1" strokeDasharray="4,4" />
+                                  <text x={x} y={chartHeight + 20} fontSize="12" fill="#374151" textAnchor="middle">
+                                    {result.year}
+                                  </text>
+                                </g>
+                              );
+                            })}
+
+                            {/* Portfolio value line */}
+                            <polyline
+                              points={stressTestResults.yearlyResults.map((result, idx) => {
+                                const x = (idx / (stressTestResults.yearlyResults.length - 1)) * chartWidth;
+                                const y = chartHeight - ((result.portfolioValue - minValue) / (maxValue - minValue) * chartHeight);
+                                return `${x},${y}`;
+                              }).join(' ')}
+                              fill="none"
+                              stroke="#ea580c"
+                              strokeWidth="3"
+                            />
+
+                            {/* Data points */}
+                            {stressTestResults.yearlyResults.map((result, idx) => {
+                              const x = (idx / (stressTestResults.yearlyResults.length - 1)) * chartWidth;
+                              const y = chartHeight - ((result.portfolioValue - minValue) / (maxValue - minValue) * chartHeight);
+                              return (
+                                <circle
+                                  key={idx}
+                                  cx={x}
+                                  cy={y}
+                                  r="4"
+                                  fill="#ea580c"
+                                />
+                              );
+                            })}
+
+                            {/* Y-axis label */}
+                            <text x="-130" y="20" transform="rotate(-90)" fontSize="14" fill="#374151" textAnchor="middle" fontWeight="bold">
+                              Portfolio Value ($)
+                            </text>
+
+                            {/* X-axis label */}
+                            <text x={chartWidth / 2} y={chartHeight + 50} fontSize="14" fill="#374151" textAnchor="middle" fontWeight="bold">
+                              Year
+                            </text>
+                          </>
                         );
-                      })}
-
-                      {/* Y-axis label */}
-                      <text x="-100" y="15" transform="rotate(-90)" fontSize="14" fill="#374151" textAnchor="middle" fontWeight="bold">
-                        Portfolio Value ($)
-                      </text>
-
-                      {/* X-axis label */}
-                      <text x="400" y="235" fontSize="14" fill="#374151" textAnchor="middle" fontWeight="bold">
-                        Year
-                      </text>
+                      })()}
                     </svg>
                   </div>
                 </div>
@@ -890,50 +930,84 @@ export default function Home() {
                 {/* Chart */}
                 <div className="mb-8 p-6 bg-gray-50 rounded-xl">
                   <h3 className="text-xl font-bold text-gray-900 mb-4">Portfolio Value Over Time</h3>
-                  <div className="relative h-80 pl-16 pb-12">
-                    <svg className="w-full h-full" viewBox="0 0 800 240" preserveAspectRatio="none">
-                      {/* Grid lines */}
-                      <line x1="0" y1="0" x2="0" y2="200" stroke="#e5e7eb" strokeWidth="1" />
-                      <line x1="0" y1="200" x2="800" y2="200" stroke="#e5e7eb" strokeWidth="2" />
-
-                      {/* Portfolio value line */}
-                      <polyline
-                        points={optimalAllocationResults.optimalAllocation.result.yearlyResults.map((result, idx) => {
-                          const x = (idx / (optimalAllocationResults.optimalAllocation.result.yearlyResults.length - 1)) * 800;
-                          const maxValue = Math.max(...optimalAllocationResults.optimalAllocation.result.yearlyResults.map(r => r.portfolioValue));
-                          const y = 200 - ((result.portfolioValue / maxValue) * 180);
-                          return `${x},${y}`;
-                        }).join(' ')}
-                        fill="none"
-                        stroke="#2563eb"
-                        strokeWidth="3"
-                      />
-
-                      {/* Data points */}
-                      {optimalAllocationResults.optimalAllocation.result.yearlyResults.map((result, idx) => {
-                        const x = (idx / (optimalAllocationResults.optimalAllocation.result.yearlyResults.length - 1)) * 800;
+                  <div className="relative h-96 pl-24 pb-16">
+                    <svg className="w-full h-full" viewBox="0 0 900 300" preserveAspectRatio="none">
+                      {/* Define constants */}
+                      {(() => {
                         const maxValue = Math.max(...optimalAllocationResults.optimalAllocation.result.yearlyResults.map(r => r.portfolioValue));
-                        const y = 200 - ((result.portfolioValue / maxValue) * 180);
+                        const minValue = Math.min(...optimalAllocationResults.optimalAllocation.result.yearlyResults.map(r => r.portfolioValue));
+                        const chartWidth = 800;
+                        const chartHeight = 220;
+
                         return (
-                          <circle
-                            key={idx}
-                            cx={x}
-                            cy={y}
-                            r="4"
-                            fill="#2563eb"
-                          />
+                          <>
+                            {/* Grid lines and Y-axis values */}
+                            {[0, 0.25, 0.5, 0.75, 1].map((fraction) => {
+                              const yPos = chartHeight - (fraction * chartHeight);
+                              const value = minValue + (maxValue - minValue) * fraction;
+                              return (
+                                <g key={fraction}>
+                                  <line x1="0" y1={yPos} x2={chartWidth} y2={yPos} stroke="#e5e7eb" strokeWidth="1" strokeDasharray="4,4" />
+                                  <text x="-10" y={yPos + 5} fontSize="12" fill="#374151" textAnchor="end">
+                                    ${(value / 1000).toFixed(0)}K
+                                  </text>
+                                </g>
+                              );
+                            })}
+
+                            {/* X-axis gridlines and values */}
+                            {optimalAllocationResults.optimalAllocation.result.yearlyResults.filter((_, idx) => idx % Math.ceil(optimalAllocationResults.optimalAllocation.result.yearlyResults.length / 8) === 0 || idx === optimalAllocationResults.optimalAllocation.result.yearlyResults.length - 1).map((result, idx, filtered) => {
+                              const actualIdx = optimalAllocationResults.optimalAllocation.result.yearlyResults.indexOf(result);
+                              const x = (actualIdx / (optimalAllocationResults.optimalAllocation.result.yearlyResults.length - 1)) * chartWidth;
+                              return (
+                                <g key={actualIdx}>
+                                  <line x1={x} y1="0" x2={x} y2={chartHeight} stroke="#e5e7eb" strokeWidth="1" strokeDasharray="4,4" />
+                                  <text x={x} y={chartHeight + 20} fontSize="12" fill="#374151" textAnchor="middle">
+                                    {result.year}
+                                  </text>
+                                </g>
+                              );
+                            })}
+
+                            {/* Portfolio value line */}
+                            <polyline
+                              points={optimalAllocationResults.optimalAllocation.result.yearlyResults.map((result, idx) => {
+                                const x = (idx / (optimalAllocationResults.optimalAllocation.result.yearlyResults.length - 1)) * chartWidth;
+                                const y = chartHeight - ((result.portfolioValue - minValue) / (maxValue - minValue) * chartHeight);
+                                return `${x},${y}`;
+                              }).join(' ')}
+                              fill="none"
+                              stroke="#2563eb"
+                              strokeWidth="3"
+                            />
+
+                            {/* Data points */}
+                            {optimalAllocationResults.optimalAllocation.result.yearlyResults.map((result, idx) => {
+                              const x = (idx / (optimalAllocationResults.optimalAllocation.result.yearlyResults.length - 1)) * chartWidth;
+                              const y = chartHeight - ((result.portfolioValue - minValue) / (maxValue - minValue) * chartHeight);
+                              return (
+                                <circle
+                                  key={idx}
+                                  cx={x}
+                                  cy={y}
+                                  r="4"
+                                  fill="#2563eb"
+                                />
+                              );
+                            })}
+
+                            {/* Y-axis label */}
+                            <text x="-130" y="20" transform="rotate(-90)" fontSize="14" fill="#374151" textAnchor="middle" fontWeight="bold">
+                              Portfolio Value ($)
+                            </text>
+
+                            {/* X-axis label */}
+                            <text x={chartWidth / 2} y={chartHeight + 50} fontSize="14" fill="#374151" textAnchor="middle" fontWeight="bold">
+                              Year
+                            </text>
+                          </>
                         );
-                      })}
-
-                      {/* Y-axis label */}
-                      <text x="-100" y="15" transform="rotate(-90)" fontSize="14" fill="#374151" textAnchor="middle" fontWeight="bold">
-                        Portfolio Value ($)
-                      </text>
-
-                      {/* X-axis label */}
-                      <text x="400" y="235" fontSize="14" fill="#374151" textAnchor="middle" fontWeight="bold">
-                        Year
-                      </text>
+                      })()}
                     </svg>
                   </div>
                 </div>
