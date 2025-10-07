@@ -17,7 +17,8 @@ Retirees and pre-retirees (60+ years old) who need accessible, easy-to-use finan
 
 ## Current Status
 
-### What's Built (Phase 1 - MVP Input Form)
+### What's Built (Phase 1 & 2 - COMPLETE ✅)
+
 ✅ **Accessible 3-question retirement planning form**
 - Years in retirement (1-60 range)
 - Year 1 withdrawal rate as % of portfolio (0.1-20% range)
@@ -34,19 +35,42 @@ Retirees and pre-retirees (60+ years old) who need accessible, easy-to-use finan
 - Large touch targets (44x44px minimum)
 - High-visibility focus indicators
 
+✅ **Monte Carlo Simulation Engine**
+- Historical bootstrap sampling (1988-2024, 443 months)
+- 100 Monte Carlo iterations (runs in ~2 seconds)
+- 70% stocks (S&P 500 Total Return) / 30% bonds (5-Year Treasury)
+- Proper portfolio failure detection (stops at $0)
+- Inflation-adjusted withdrawals (annual increases)
+- Python serverless API on Vercel
+
+✅ **Results Visualization**
+- Large, color-coded success rate display:
+  - Green (≥90%): Excellent plan
+  - Yellow (75-89%): Good but cautious
+  - Red (<75%): High risk
+- Success/failure counts
+- Average final portfolio value (successful cases)
+- Median years to failure (failed cases)
+- Methodology explanation
+- "Run Again" button for easy parameter adjustment
+
 ✅ **User Experience**
 - Clean, uncluttered layout
 - Real-time form validation with helpful error messages
 - Visual feedback for voice features (pulsing microphone when listening)
+- Loading spinner during simulation
+- Results announced via text-to-speech
 - Helpful instructions and placeholder text
 
 ### What's NOT Built Yet
-❌ Monte Carlo simulation engine
-❌ Results visualization (charts/graphs)
+❌ Advanced visualization (charts/graphs showing portfolio paths)
 ❌ Additional input fields (age, retirement age, portfolio size, Social Security)
+❌ Portfolio allocation optimization (solver-based)
+❌ Variable allocation strategies (rebalancing, glide paths)
 ❌ Data persistence (Supabase integration)
+❌ User accounts and saved scenarios
 ❌ Custom domain connection (LongevityPlanning.ai)
-❌ Backend optimizer API (Python)
+❌ Separate optimizer API for heavy computation (10,000+ iterations)
 
 ---
 
@@ -67,10 +91,14 @@ Retirees and pre-retirees (60+ years old) who need accessible, easy-to-use finan
 - **Vercel** (auto-deploys from GitHub main branch)
 - **Production URL:** https://retirement-planning-blush.vercel.app/
 
+### Backend (Python API)
+- **Python 3.12** (Vercel serverless functions)
+- **Pandas 2.2.0** (data processing)
+- **NumPy 1.26.4** (numerical computations)
+
 ### Planned (Not Yet Implemented)
 - **Supabase** (PostgreSQL database for persistence)
-- **Python 3.11** (optimizer API)
-- **NumPy/SciPy** (Monte Carlo simulations)
+- **SciPy** (portfolio optimization solvers)
 
 ---
 
@@ -80,22 +108,32 @@ Retirees and pre-retirees (60+ years old) who need accessible, easy-to-use finan
 retirement-planning/
 ├── .devcontainer/
 │   └── devcontainer.json          # GitHub Codespaces configuration
-├── frontend/
+├── frontend/                      # Vercel root directory
 │   ├── app/
-│   │   ├── layout.tsx             # Root layout with metadata and skip-to-content
-│   │   ├── page.tsx               # Main form component (308 lines)
+│   │   ├── layout.tsx             # Root layout with metadata
+│   │   ├── page.tsx               # Main form + Monte Carlo integration
 │   │   └── globals.css            # Accessibility-first theme
+│   ├── api/
+│   │   └── monte-carlo.py         # Python serverless function (Vercel)
+│   ├── data/
+│   │   ├── monthly_returns.csv    # Historical market data (443 months)
+│   │   ├── historical_returns_final.csv  # Full dataset with metadata
+│   │   └── *.csv                  # Additional historical data files
 │   ├── public/                    # Static assets
-│   ├── package.json               # Dependencies
+│   ├── requirements.txt           # Python dependencies (pandas, numpy)
+│   ├── package.json               # Node.js dependencies
 │   ├── tsconfig.json              # TypeScript config
 │   ├── tailwind.config.ts         # Tailwind setup
 │   ├── next.config.ts             # Next.js config
 │   └── eslint.config.mjs          # ESLint rules
-├── optimizer-api/                 # (Not yet implemented)
+├── scripts/
+│   ├── download_historical_data.py    # Data download script
+│   └── download_sp500_yahoo.py        # S&P 500 data download
+├── optimizer-api/                 # (Planned - for heavy computation)
 ├── ARCHITECTURE.md                # Technical architecture and roadmap
 ├── prd.md                         # Product requirements document
 ├── claude.md                      # Development workflow guide
-├── todo.md                        # Development tracking and deep thinking
+├── todo.md                        # Development tracking
 └── documentation.md               # This file
 ```
 
@@ -817,6 +855,31 @@ if portfolio_value <= 0:
 
 ## Change Log
 
+### 2025-10-07 - Monte Carlo Simulation Complete ✅
+- ✅ Implemented historical bootstrap Monte Carlo engine
+- ✅ Created Python serverless API (`/api/monte-carlo.py`)
+- ✅ Downloaded and validated 443 months of historical data (1988-2024)
+- ✅ S&P 500 Total Return + 5-Year Treasury + CPI data
+- ✅ Researched and documented distribution choices (Normal vs Lognormal vs t-distribution vs Bootstrap)
+- ✅ Chose historical bootstrap as best practice for retirement planning
+- ✅ Built beautiful results display with color-coded success rates
+- ✅ Added loading spinner and progress indication
+- ✅ Results announced via text-to-speech for accessibility
+- ✅ Fixed Vercel deployment configuration (moved api/data into frontend/)
+- ✅ Tested and verified: 100 simulations run in ~2 seconds
+- ✅ **Production deployment successful**
+
+### 2025-10-07 - Historical Data Collection & Validation
+- ✅ Downloaded S&P 500 Total Return data from Yahoo Finance (1988-2024)
+- ✅ Downloaded 5-Year and 10-Year Treasury yields from FRED
+- ✅ Downloaded CPI inflation data from FRED
+- ✅ Implemented bond math (modified duration approximation)
+- ✅ Validated against Damodaran annual data
+- ✅ Performed sanity checks (2008 crisis, COVID crash)
+- ✅ Created comprehensive documentation on data sources and methodology
+- ✅ Explained why we need monthly data (sequence of returns risk)
+- ✅ Documented bond total return calculations
+
 ### 2025-10-07 - Voice Features & TypeScript Fixes
 - ✅ Added female voice text-to-speech
 - ✅ Added speech-to-text input for all fields
@@ -824,7 +887,7 @@ if portfolio_value <= 0:
 - ✅ Deployed to Vercel successfully
 
 ### 2025-10-07 - Initial Form Implementation
-- ✅ Initialized Next.js 14 with TypeScript and Tailwind
+- ✅ Initialized Next.js 15 with TypeScript and Tailwind
 - ✅ Created accessibility-first theme
 - ✅ Built 3-question form component
 - ✅ Added text-to-speech (initial version)
@@ -842,5 +905,5 @@ if portfolio_value <= 0:
 ---
 
 **Last Updated:** October 7, 2025
-**Current Version:** 0.1.0 (MVP Input Form)
-**Status:** ✅ Phase 1 Complete - Ready for user testing
+**Current Version:** 0.2.0 (Monte Carlo Simulation)
+**Status:** ✅ Phase 1 & 2 Complete - Production Ready
