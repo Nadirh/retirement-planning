@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, FormEvent } from 'react';
+import { useState } from 'react';
 
 interface AllocationData {
   stockPercent: number;
@@ -455,9 +455,7 @@ export default function Home() {
             <div className="mt-8 p-6 bg-purple-50 border-2 border-purple-200 rounded-lg text-center" role="status" aria-live="polite">
               <div className="animate-spin mx-auto w-12 h-12 border-4 border-purple-600 border-t-transparent rounded-full mb-4"></div>
               <p className="text-xl text-purple-800 font-medium">
-                {sweepResults === null && results === null ?
-                  'Running Monte Carlo simulations...' :
-                  'Running Monte Carlo simulations...'}
+                Running Monte Carlo simulations...
               </p>
               <p className="text-lg text-purple-700 mt-2">
                 This may take a few seconds
