@@ -41,7 +41,7 @@ export default function Home() {
   const [formData, setFormData] = useState({
     yearsInRetirement: '',
     withdrawalRate: '',
-    inflationRate: '3',
+    inflationRate: '',
   });
 
   const [errors, setErrors] = useState({
@@ -53,7 +53,6 @@ export default function Home() {
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [isListening, setIsListening] = useState<string | null>(null);
   const [isSimulating, setIsSimulating] = useState(false);
-  const [results, setResults] = useState<MonteCarloResult | null>(null);
   const [sweepResults, setSweepResults] = useState<AllocationSweepResult | null>(null);
 
   // Text-to-speech function with female voice
@@ -179,72 +178,21 @@ export default function Home() {
       isValid = false;
     }
 
-    // Validate inflation rate
-    const inflation = parseFloat(formData.inflationRate);
-    if (!formData.inflationRate) {
-      newErrors.inflationRate = 'Please enter your expected inflation rate';
-      isValid = false;
-    } else if (isNaN(inflation) || inflation < 0 || inflation > 10) {
-      newErrors.inflationRate = 'Please enter a value between 0% and 10%';
-      isValid = false;
+    // Validate inflation rate (optional)
+    if (formData.inflationRate) {
+      const inflation = parseFloat(formData.inflationRate);
+      if (isNaN(inflation) || inflation < 0 || inflation > 10) {
+        newErrors.inflationRate = 'Please enter a value between 0% and 10%';
+        isValid = false;
+      }
     }
 
     setErrors(newErrors);
     return isValid;
   };
 
-  const handleSubmit = async (e: FormEvent) => {
-    e.preventDefault();
-
-    if (!validateForm()) {
-      // Announce errors for screen readers
-      const errorMessages = Object.values(errors).filter(e => e).join('. ');
-      if (errorMessages) {
-        const errorAnnouncement = `Please fix the following errors: ${errorMessages}`;
-        speak(errorAnnouncement);
-      }
-      return;
-    }
-
-    // Clear previous results
-    setResults(null);
-    setSweepResults(null);
-    setIsSimulating(true);
-
-    try {
-      // Call Monte Carlo API
-      const response = await fetch('/api/monte-carlo', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          years: parseInt(formData.yearsInRetirement),
-          withdrawalRate: parseFloat(formData.withdrawalRate),
-          inflation: formData.inflationRate ? parseFloat(formData.inflationRate) : null,
-          stockAllocation: 70,
-          bondAllocation: 30,
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error('Simulation failed');
-      }
-
-      const data: MonteCarloResult = await response.json();
-      setResults(data);
-
-      // Announce results for screen readers
-      speak(`Simulation complete. Your retirement plan has a ${data.successRate.toFixed(1)} percent success rate based on 100 simulations.`);
-    } catch (error) {
-      console.error('Monte Carlo simulation error:', error);
-      alert('Sorry, the simulation failed. Please try again.');
-    } finally {
-      setIsSimulating(false);
-    }
-  };
-
-  const handleAllocationSweep = async () => {
+  const handleAllocationSweep = async (e?: FormEvent) => {
+    if (e) e.preventDefault();
     if (!validateForm()) {
       const errorMessages = Object.values(errors).filter(e => e).join('. ');
       if (errorMessages) {
@@ -255,7 +203,6 @@ export default function Home() {
     }
 
     // Clear previous results
-    setResults(null);
     setSweepResults(null);
     setIsSimulating(true);
 
@@ -293,7 +240,7 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-gray-50 py-8 px-4 sm:px-6 lg:px-8">
-      <div className={`mx-auto transition-all ${sweepResults ? 'max-w-6xl' : 'max-w-2xl'}`}>
+      <div className={`mx-auto transition-all ${sweepResults ? 'max-w-7xl' : 'max-w-2xl'}`}>
         {/* Header */}
         <header className="text-center mb-12">
           <h1 className="text-4xl sm:text-5xl font-bold text-gray-900 mb-4">
@@ -328,9 +275,6 @@ export default function Home() {
                     </svg>
                   </button>
                 </label>
-                <p className="text-lg text-gray-600 mb-4">
-                  Enter the number of years you expect to be retired (e.g., 25 or 30 years)
-                </p>
                 <div className="flex gap-3 items-start">
                   <input
                     type="number"
@@ -381,7 +325,7 @@ export default function Home() {
                   2. How much would you like to withdraw in year 1 as a percentage of your total portfolio?
                   <button
                     type="button"
-                    onClick={() => speak('How much would you like to withdraw in year 1 as a percentage of your total portfolio? Enter a percentage between 0.1 and 20. For example, the traditional rule suggests 4 percent. This is the amount you will withdraw in the first year, and it will adjust with inflation each year after.')}
+                    onClick={() => speak('How much would you like to withdraw in year 1 as a percentage of your total portfolio? Enter a percentage between 0.1 and 20. This is the amount you will withdraw in the first year, and it will adjust with inflation each year after.')}
                     className="ml-3 inline-flex items-center justify-center w-10 h-10 rounded-full bg-blue-100 text-blue-600 hover:bg-blue-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
                     aria-label="Read question aloud"
                     title="Listen to this question"
@@ -391,9 +335,6 @@ export default function Home() {
                     </svg>
                   </button>
                 </label>
-                <p className="text-lg text-gray-600 mb-4">
-                  The traditional &quot;4% rule&quot; suggests withdrawing 4% annually
-                </p>
                 <div className="flex gap-3 items-start">
                   <div className="relative flex-1">
                     <input
@@ -449,7 +390,7 @@ export default function Home() {
                   3. What inflation rate would you like to use?
                   <button
                     type="button"
-                    onClick={() => speak('What inflation rate would you like to use? Enter a percentage between 0 and 10. The default is 3 percent. This determines how much your withdrawals will increase each year to maintain your purchasing power.')}
+                    onClick={() => speak('What inflation rate would you like to use? Enter a percentage between 0 and 10. If you leave this blank, we will use historical numbers. This determines how much your withdrawals will increase each year to maintain your purchasing power.')}
                     className="ml-3 inline-flex items-center justify-center w-10 h-10 rounded-full bg-blue-100 text-blue-600 hover:bg-blue-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
                     aria-label="Read question aloud"
                     title="Listen to this question"
@@ -460,7 +401,7 @@ export default function Home() {
                   </button>
                 </label>
                 <p className="text-lg text-gray-600 mb-4">
-                  Your withdrawals will grow at this rate each year (default: 3%)
+                  If you leave this blank, we will use historical numbers
                 </p>
                 <div className="flex gap-3 items-start">
                   <div className="relative flex-1">
@@ -508,23 +449,15 @@ export default function Home() {
                 )}
               </div>
 
-              {/* Submit Buttons */}
-              <div className="pt-6 space-y-4">
-                <button
-                  type="submit"
-                  disabled={isSimulating}
-                  className="w-full py-5 px-8 text-2xl font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-4 focus:ring-blue-500 focus:ring-offset-2 transition-colors shadow-lg hover:shadow-xl disabled:bg-gray-400 disabled:cursor-not-allowed"
-                >
-                  {isSimulating ? 'Running Simulation...' : 'Calculate My Retirement Plan'}
-                </button>
-
+              {/* Submit Button */}
+              <div className="pt-6">
                 <button
                   type="button"
                   onClick={handleAllocationSweep}
                   disabled={isSimulating}
                   className="w-full py-5 px-8 text-2xl font-semibold text-white bg-purple-600 rounded-lg hover:bg-purple-700 focus:outline-none focus:ring-4 focus:ring-purple-500 focus:ring-offset-2 transition-colors shadow-lg hover:shadow-xl disabled:bg-gray-400 disabled:cursor-not-allowed"
                 >
-                  {isSimulating ? 'Running Sweep...' : 'Find Best Stock/Bond Allocation'}
+                  {isSimulating ? 'Running Analysis...' : 'Find Best Stock/Bond Allocation'}
                 </button>
               </div>
             </div>
@@ -542,94 +475,6 @@ export default function Home() {
               <p className="text-lg text-purple-700 mt-2">
                 This may take a few seconds
               </p>
-            </div>
-          )}
-
-          {/* Results Display */}
-          {results && !isSimulating && (
-            <div className="mt-8 p-8 bg-white border-4 rounded-2xl shadow-xl" role="region" aria-label="Simulation Results">
-              <h2 className="text-3xl font-bold text-gray-900 mb-6 text-center">
-                Your Retirement Plan Results
-              </h2>
-
-              {/* Success Rate - Large Display */}
-              <div className={`text-center p-8 rounded-xl mb-6 ${
-                results.successRate >= 90 ? 'bg-green-100 border-4 border-green-500' :
-                results.successRate >= 75 ? 'bg-yellow-100 border-4 border-yellow-500' :
-                'bg-red-100 border-4 border-red-500'
-              }`}>
-                <p className="text-2xl font-semibold mb-2 text-gray-700">Success Rate</p>
-                <p className={`text-6xl sm:text-7xl font-bold ${
-                  results.successRate >= 90 ? 'text-green-700' :
-                  results.successRate >= 75 ? 'text-yellow-700' :
-                  'text-red-700'
-                }`}>
-                  {results.successRate.toFixed(1)}%
-                </p>
-                <p className="text-xl mt-4 text-gray-700">
-                  {results.successRate >= 90 ? '✅ Excellent! Your plan looks very strong.' :
-                   results.successRate >= 75 ? '⚠️ Good, but consider reducing withdrawal rate.' :
-                   '❌ High risk. Consider reducing withdrawal rate or increasing bond allocation.'}
-                </p>
-              </div>
-
-              {/* Detailed Statistics */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-6">
-                <div className="p-6 bg-gray-50 rounded-xl border-2 border-gray-200">
-                  <p className="text-lg font-semibold text-gray-700 mb-2">Successful Scenarios</p>
-                  <p className="text-4xl font-bold text-green-600">{results.successes}</p>
-                  <p className="text-gray-600 mt-1">out of {results.totalSimulations}</p>
-                </div>
-
-                <div className="p-6 bg-gray-50 rounded-xl border-2 border-gray-200">
-                  <p className="text-lg font-semibold text-gray-700 mb-2">Failed Scenarios</p>
-                  <p className="text-4xl font-bold text-red-600">{results.failures}</p>
-                  <p className="text-gray-600 mt-1">ran out of money</p>
-                </div>
-              </div>
-
-              {/* Additional Details */}
-              {results.successes > 0 && (
-                <div className="p-6 bg-blue-50 rounded-xl border-2 border-blue-200 mb-4">
-                  <p className="text-lg font-semibold text-gray-700 mb-2">Average Final Portfolio (Successful Cases)</p>
-                  <p className="text-3xl font-bold text-blue-700">
-                    ${results.details.avgFinalPortfolio.toLocaleString('en-US', { maximumFractionDigits: 0 })}
-                  </p>
-                </div>
-              )}
-
-              {results.details.medianYearsToFailure !== null && (
-                <div className="p-6 bg-orange-50 rounded-xl border-2 border-orange-200 mb-4">
-                  <p className="text-lg font-semibold text-gray-700 mb-2">Median Years Until Failure (Failed Cases)</p>
-                  <p className="text-3xl font-bold text-orange-700">
-                    {results.details.medianYearsToFailure.toFixed(1)} years
-                  </p>
-                </div>
-              )}
-
-              {/* Methodology */}
-              <div className="mt-6 p-4 bg-gray-100 rounded-lg text-sm text-gray-700">
-                <p className="font-semibold mb-2">📊 Methodology:</p>
-                <ul className="list-disc list-inside space-y-1">
-                  <li>100 Monte Carlo simulations using historical bootstrap (1988-2024)</li>
-                  <li>Portfolio: 70% stocks (S&P 500), 30% bonds (5-Year Treasury)</li>
-                  <li>Inflation: {results.details.usedBootstrap ? 'Historical bootstrap' : `Fixed at ${formData.inflationRate}%`}</li>
-                  <li>Withdrawals adjusted annually for inflation</li>
-                </ul>
-              </div>
-
-              {/* Run Again Button */}
-              <div className="mt-8 text-center">
-                <button
-                  onClick={() => {
-                    setResults(null);
-                    window.scrollTo({ top: 0, behavior: 'smooth' });
-                  }}
-                  className="px-8 py-4 text-xl font-semibold text-blue-600 bg-white border-2 border-blue-600 rounded-lg hover:bg-blue-50 focus:outline-none focus:ring-4 focus:ring-blue-500 focus:ring-offset-2 transition-colors"
-                >
-                  Adjust Parameters & Run Again
-                </button>
-              </div>
             </div>
           )}
 
@@ -673,6 +518,7 @@ export default function Home() {
                         <th className="p-4 text-lg font-bold text-gray-700 text-right">Success Rate</th>
                         <th className="p-4 text-lg font-bold text-gray-700 text-right">Successes</th>
                         <th className="p-4 text-lg font-bold text-gray-700 text-right">Failures</th>
+                        <th className="p-4 text-lg font-bold text-gray-700 text-right">Median Years to Failure</th>
                         <th className="p-4 text-lg font-bold text-gray-700 text-right">Avg Final Portfolio</th>
                       </tr>
                     </thead>
@@ -701,6 +547,9 @@ export default function Home() {
                             </td>
                             <td className="p-4 text-lg text-right text-green-600">{alloc.successes}</td>
                             <td className="p-4 text-lg text-right text-red-600">{alloc.failures}</td>
+                            <td className="p-4 text-lg text-right text-orange-700 font-semibold">
+                              {alloc.medianYearsToFailure !== null ? `${alloc.medianYearsToFailure.toFixed(1)} yrs` : 'N/A'}
+                            </td>
                             <td className="p-4 text-lg text-right font-mono">
                               ${alloc.avgFinalPortfolio.toLocaleString('en-US', { maximumFractionDigits: 0 })}
                             </td>
