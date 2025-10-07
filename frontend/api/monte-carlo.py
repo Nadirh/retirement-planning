@@ -218,13 +218,13 @@ def run_monte_carlo(years, withdrawal_rate, inflation_input, stock_allocation, b
 
 def run_historical_stress_test(years, withdrawal_rate, stock_allocation, bond_allocation):
     """
-    Run a deterministic historical simulation starting October 2007
+    Run a deterministic historical simulation starting March 2004
 
-    This simulates the worst time to retire (right before 2008 financial crisis)
-    using actual historical data from October 2007 through December 2024.
+    This simulates the worst time to retire (worst 5-year period in stock market history)
+    using actual historical data from March 2004 through December 2024.
 
     Parameters:
-    - years: Number of years in retirement (if ≤17, stop at Oct 2024; if ≥18, stop at Dec 2024)
+    - years: Number of years in retirement (if ≤20, stop at Mar 2024; if ≥21, stop at Dec 2024)
     - withdrawal_rate: Annual withdrawal as % of portfolio (decimal)
     - stock_allocation: % in stocks (decimal)
     - bond_allocation: % in bonds (decimal)
@@ -238,16 +238,22 @@ def run_historical_stress_test(years, withdrawal_rate, stock_allocation, bond_al
     df = pd.read_csv(Path(__file__).parent.parent / 'data' / 'monthly_returns.csv')
     df['Date'] = pd.to_datetime(df['Date'])
 
-    # Filter data from October 2007 onwards
-    start_date = pd.to_datetime('2007-10-31')
+    # Stress test configuration: March 2004 (worst 5-year period)
+    start_year = 2004
+    start_month = 3  # March
+    start_day = 31
+    anniversary_month = 3  # Record values every March
+
+    start_date = pd.to_datetime(f'{start_year}-{start_month:02d}-{start_day}')
     historical_subset = df[df['Date'] >= start_date].reset_index(drop=True)
 
-    # Determine end date based on years
-    if years <= 17:
-        # Stop at October 2024 (17 years after Oct 2007)
+    # Determine end date based on years (20 years from March 2004 = March 2024)
+    years_from_start = 2024 - start_year  # 20 years available
+    if years <= years_from_start:
+        # Stop at anniversary month in final year
         max_months = years * 12
-        end_year = 2024
-        end_month = 10
+        end_year = start_year + years
+        end_month = anniversary_month
     else:
         # Stop at December 2024
         max_months = min(years * 12, len(historical_subset))
@@ -265,10 +271,11 @@ def run_historical_stress_test(years, withdrawal_rate, stock_allocation, bond_al
     failure_year = None
 
     # Add starting value
+    start_date_str = start_date.strftime('%B %Y')
     yearly_results.append({
-        'date': 'October 2007',
+        'date': start_date_str,
         'portfolioValue': initial_portfolio,
-        'year': 2007
+        'year': start_year
     })
 
     # Run simulation month by month
@@ -303,17 +310,17 @@ def run_historical_stress_test(years, withdrawal_rate, stock_allocation, bond_al
             failure_year = row['Date'].year
             break
 
-        # Record October values each year (skip the starting October 2007)
+        # Record anniversary month values each year (skip the starting year)
         current_date = row['Date']
-        if current_date.month == 10 and current_date.year > 2007:
+        if current_date.month == anniversary_month and current_date.year > start_year:
             yearly_results.append({
-                'date': f"October {current_date.year}",
+                'date': f"{current_date.strftime('%B')} {current_date.year}",
                 'portfolioValue': portfolio,
                 'year': current_date.year
             })
 
-    # Add final December 2024 value if portfolio still exists and years >= 18
-    if not failed and years >= 18:
+    # Add final December 2024 value if portfolio still exists and years exceed available history
+    if not failed and years > years_from_start:
         # Continue to December 2024
         dec_2024_data = historical_subset[historical_subset['Date'] <= '2024-12-31']
         remaining_months = len(dec_2024_data) - max_months
@@ -350,7 +357,7 @@ def run_historical_stress_test(years, withdrawal_rate, stock_allocation, bond_al
 
     return {
         'type': 'historicalStressTest',
-        'startDate': 'October 2007',
+        'startDate': start_date_str,
         'yearsSimulated': years,
         'initialPortfolio': initial_portfolio,
         'stockAllocation': stock_allocation * 100,
