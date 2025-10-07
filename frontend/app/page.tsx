@@ -761,16 +761,14 @@ export default function Home() {
                 {/* Simple Line Chart */}
                 <div className="mb-8 p-6 bg-gray-50 rounded-xl">
                   <h3 className="text-xl font-bold text-gray-900 mb-4">Portfolio Value Over Time</h3>
-                  <div className="relative h-96 pl-24 pb-16">
-                    <svg className="w-full h-full" viewBox="0 0 900 300" preserveAspectRatio="none">
+                  <div className="relative h-96">
+                    <svg className="w-full h-full" viewBox="-80 -10 920 320" preserveAspectRatio="xMidYMid meet">
                       {/* Define constants */}
                       {(() => {
                         const maxValue = Math.max(...stressTestResults.yearlyResults.map(r => r.portfolioValue));
                         const minValue = Math.min(...stressTestResults.yearlyResults.map(r => r.portfolioValue));
                         const chartWidth = 800;
                         const chartHeight = 220;
-                        const startYear = stressTestResults.yearlyResults[0].year;
-                        const endYear = stressTestResults.yearlyResults[stressTestResults.yearlyResults.length - 1].year;
 
                         return (
                           <>
@@ -830,7 +828,7 @@ export default function Home() {
                             })}
 
                             {/* Y-axis label */}
-                            <text x="-130" y="20" transform="rotate(-90)" fontSize="14" fill="#374151" textAnchor="middle" fontWeight="bold">
+                            <text x="-70" y="15" transform="rotate(-90 -70 15)" fontSize="14" fill="#374151" textAnchor="middle" fontWeight="bold">
                               Portfolio Value ($)
                             </text>
 
@@ -930,8 +928,8 @@ export default function Home() {
                 {/* Chart */}
                 <div className="mb-8 p-6 bg-gray-50 rounded-xl">
                   <h3 className="text-xl font-bold text-gray-900 mb-4">Portfolio Value Over Time</h3>
-                  <div className="relative h-96 pl-24 pb-16">
-                    <svg className="w-full h-full" viewBox="0 0 900 300" preserveAspectRatio="none">
+                  <div className="relative h-96">
+                    <svg className="w-full h-full" viewBox="-80 -10 920 320" preserveAspectRatio="xMidYMid meet">
                       {/* Define constants */}
                       {(() => {
                         const maxValue = Math.max(...optimalAllocationResults.optimalAllocation.result.yearlyResults.map(r => r.portfolioValue));
@@ -997,7 +995,7 @@ export default function Home() {
                             })}
 
                             {/* Y-axis label */}
-                            <text x="-130" y="20" transform="rotate(-90)" fontSize="14" fill="#374151" textAnchor="middle" fontWeight="bold">
+                            <text x="-70" y="15" transform="rotate(-90 -70 15)" fontSize="14" fill="#374151" textAnchor="middle" fontWeight="bold">
                               Portfolio Value ($)
                             </text>
 
