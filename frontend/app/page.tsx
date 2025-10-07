@@ -14,6 +14,29 @@ interface MonteCarloResult {
   };
 }
 
+interface AllocationData {
+  stockPercent: number;
+  bondPercent: number;
+  successRate: number;
+  successes: number;
+  failures: number;
+  avgFinalPortfolio: number;
+  medianYearsToFailure: number | null;
+}
+
+interface AllocationSweepResult {
+  type: 'allocationSweep';
+  allocations: AllocationData[];
+  bestAllocation: {
+    stockPercent: number;
+    bondPercent: number;
+    successRate: number;
+  };
+  totalCombinations: number;
+  simulationsPerCombination: number;
+  totalSimulations: number;
+}
+
 export default function Home() {
   const [formData, setFormData] = useState({
     yearsInRetirement: '',
@@ -31,6 +54,7 @@ export default function Home() {
   const [isListening, setIsListening] = useState<string | null>(null);
   const [isSimulating, setIsSimulating] = useState(false);
   const [results, setResults] = useState<MonteCarloResult | null>(null);
+  const [sweepResults, setSweepResults] = useState<AllocationSweepResult | null>(null);
 
   // Text-to-speech function with female voice
   const speak = (text: string) => {
@@ -184,6 +208,7 @@ export default function Home() {
 
     // Clear previous results
     setResults(null);
+    setSweepResults(null);
     setIsSimulating(true);
 
     try {
@@ -219,9 +244,56 @@ export default function Home() {
     }
   };
 
+  const handleAllocationSweep = async () => {
+    if (!validateForm()) {
+      const errorMessages = Object.values(errors).filter(e => e).join('. ');
+      if (errorMessages) {
+        const errorAnnouncement = `Please fix the following errors: ${errorMessages}`;
+        speak(errorAnnouncement);
+      }
+      return;
+    }
+
+    // Clear previous results
+    setResults(null);
+    setSweepResults(null);
+    setIsSimulating(true);
+
+    try {
+      // Call Monte Carlo API with allocation sweep
+      const response = await fetch('/api/monte-carlo', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          years: parseInt(formData.yearsInRetirement),
+          withdrawalRate: parseFloat(formData.withdrawalRate),
+          inflation: formData.inflationRate ? parseFloat(formData.inflationRate) : null,
+          allocationSweep: true,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Allocation sweep failed');
+      }
+
+      const data: AllocationSweepResult = await response.json();
+      setSweepResults(data);
+
+      // Announce results for screen readers
+      speak(`Allocation sweep complete. Tested ${data.totalCombinations} different allocations. Best allocation is ${data.bestAllocation.stockPercent} percent stocks with a ${data.bestAllocation.successRate.toFixed(1)} percent success rate.`);
+    } catch (error) {
+      console.error('Allocation sweep error:', error);
+      alert('Sorry, the allocation sweep failed. Please try again.');
+    } finally {
+      setIsSimulating(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gray-50 py-8 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-2xl mx-auto">
+      <div className={`mx-auto transition-all ${sweepResults ? 'max-w-6xl' : 'max-w-2xl'}`}>
         {/* Header */}
         <header className="text-center mb-12">
           <h1 className="text-4xl sm:text-5xl font-bold text-gray-900 mb-4">
@@ -436,8 +508,8 @@ export default function Home() {
                 )}
               </div>
 
-              {/* Submit Button */}
-              <div className="pt-6">
+              {/* Submit Buttons */}
+              <div className="pt-6 space-y-4">
                 <button
                   type="submit"
                   disabled={isSimulating}
@@ -445,18 +517,29 @@ export default function Home() {
                 >
                   {isSimulating ? 'Running Simulation...' : 'Calculate My Retirement Plan'}
                 </button>
+
+                <button
+                  type="button"
+                  onClick={handleAllocationSweep}
+                  disabled={isSimulating}
+                  className="w-full py-5 px-8 text-2xl font-semibold text-white bg-purple-600 rounded-lg hover:bg-purple-700 focus:outline-none focus:ring-4 focus:ring-purple-500 focus:ring-offset-2 transition-colors shadow-lg hover:shadow-xl disabled:bg-gray-400 disabled:cursor-not-allowed"
+                >
+                  {isSimulating ? 'Running Sweep...' : 'Find Best Stock/Bond Allocation'}
+                </button>
               </div>
             </div>
           </form>
 
           {/* Loading Indicator */}
           {isSimulating && (
-            <div className="mt-8 p-6 bg-blue-50 border-2 border-blue-200 rounded-lg text-center" role="status" aria-live="polite">
-              <div className="animate-spin mx-auto w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full mb-4"></div>
-              <p className="text-xl text-blue-800 font-medium">
-                Running 100 Monte Carlo simulations...
+            <div className="mt-8 p-6 bg-purple-50 border-2 border-purple-200 rounded-lg text-center" role="status" aria-live="polite">
+              <div className="animate-spin mx-auto w-12 h-12 border-4 border-purple-600 border-t-transparent rounded-full mb-4"></div>
+              <p className="text-xl text-purple-800 font-medium">
+                {sweepResults === null && results === null ?
+                  'Running Monte Carlo simulations...' :
+                  'Running Monte Carlo simulations...'}
               </p>
-              <p className="text-lg text-blue-700 mt-2">
+              <p className="text-lg text-purple-700 mt-2">
                 This may take a few seconds
               </p>
             </div>
@@ -546,6 +629,113 @@ export default function Home() {
                 >
                   Adjust Parameters & Run Again
                 </button>
+              </div>
+            </div>
+          )}
+
+          {/* Allocation Sweep Results Table */}
+          {sweepResults && !isSimulating && (
+            <div className="mt-8 bg-white border-4 rounded-2xl shadow-xl overflow-hidden" role="region" aria-label="Allocation Sweep Results">
+              {/* Header */}
+              <div className="bg-gradient-to-r from-purple-600 to-purple-700 p-8 text-white">
+                <h2 className="text-3xl font-bold mb-3">
+                  🎯 Portfolio Allocation Analysis
+                </h2>
+                <p className="text-xl opacity-90">
+                  Tested {sweepResults.totalCombinations} different stock/bond allocations ({sweepResults.totalSimulations.toLocaleString()} total simulations)
+                </p>
+              </div>
+
+              {/* Best Allocation Highlight */}
+              <div className="p-8 bg-gradient-to-r from-green-50 to-emerald-50 border-b-4 border-green-500">
+                <div className="flex items-center justify-center mb-4">
+                  <span className="text-5xl mr-4">🏆</span>
+                  <h3 className="text-3xl font-bold text-green-800">Best Allocation</h3>
+                </div>
+                <div className="text-center">
+                  <p className="text-5xl font-bold text-green-700 mb-2">
+                    {sweepResults.bestAllocation.stockPercent}% Stocks / {sweepResults.bestAllocation.bondPercent}% Bonds
+                  </p>
+                  <p className="text-3xl font-semibold text-green-600">
+                    {sweepResults.bestAllocation.successRate.toFixed(1)}% Success Rate
+                  </p>
+                </div>
+              </div>
+
+              {/* Results Table */}
+              <div className="p-8">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr className="bg-gray-100 border-b-2 border-gray-300">
+                        <th className="p-4 text-lg font-bold text-gray-700">Stocks</th>
+                        <th className="p-4 text-lg font-bold text-gray-700">Bonds</th>
+                        <th className="p-4 text-lg font-bold text-gray-700 text-right">Success Rate</th>
+                        <th className="p-4 text-lg font-bold text-gray-700 text-right">Successes</th>
+                        <th className="p-4 text-lg font-bold text-gray-700 text-right">Failures</th>
+                        <th className="p-4 text-lg font-bold text-gray-700 text-right">Avg Final Portfolio</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {sweepResults.allocations.map((alloc, idx) => {
+                        const isBest = alloc.stockPercent === sweepResults.bestAllocation.stockPercent;
+                        const successRateColor =
+                          alloc.successRate >= 90 ? 'text-green-700 font-bold' :
+                          alloc.successRate >= 75 ? 'text-yellow-700 font-semibold' :
+                          'text-red-700';
+
+                        return (
+                          <tr
+                            key={idx}
+                            className={`border-b border-gray-200 hover:bg-gray-50 transition-colors ${
+                              isBest ? 'bg-green-100 border-l-4 border-green-500' : ''
+                            }`}
+                          >
+                            <td className="p-4 text-lg font-semibold">
+                              {isBest && <span className="mr-2">🏆</span>}
+                              {alloc.stockPercent}%
+                            </td>
+                            <td className="p-4 text-lg">{alloc.bondPercent}%</td>
+                            <td className={`p-4 text-xl text-right ${successRateColor}`}>
+                              {alloc.successRate.toFixed(1)}%
+                            </td>
+                            <td className="p-4 text-lg text-right text-green-600">{alloc.successes}</td>
+                            <td className="p-4 text-lg text-right text-red-600">{alloc.failures}</td>
+                            <td className="p-4 text-lg text-right font-mono">
+                              ${alloc.avgFinalPortfolio.toLocaleString('en-US', { maximumFractionDigits: 0 })}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Methodology */}
+                <div className="mt-8 p-6 bg-gray-100 rounded-lg text-sm text-gray-700">
+                  <p className="font-semibold mb-2">📊 Methodology:</p>
+                  <ul className="list-disc list-inside space-y-1">
+                    <li>{sweepResults.simulationsPerCombination} Monte Carlo simulations per allocation using historical bootstrap (1988-2024)</li>
+                    <li>Total of {sweepResults.totalSimulations.toLocaleString()} simulations across {sweepResults.totalCombinations} different allocations</li>
+                    <li>S&P 500 for stocks, 5-Year Treasury for bonds</li>
+                    <li>Inflation: {formData.inflationRate ? `Fixed at ${formData.inflationRate}%` : 'Historical bootstrap'}</li>
+                    <li>Withdrawals adjusted annually for inflation</li>
+                    <li>No portfolio rebalancing</li>
+                  </ul>
+                </div>
+
+                {/* Run Again Button */}
+                <div className="mt-8 text-center">
+                  <button
+                    onClick={() => {
+                      setSweepResults(null);
+                      window.scrollTo({ top: 0, behavior: 'smooth' });
+                    }}
+                    className="px-8 py-4 text-xl font-semibold text-purple-600 bg-white border-2 border-purple-600 rounded-lg hover:bg-purple-50 focus:outline-none focus:ring-4 focus:ring-purple-500 focus:ring-offset-2 transition-colors"
+                  >
+                    Adjust Parameters & Run Again
+                  </button>
+                </div>
               </div>
             </div>
           )}

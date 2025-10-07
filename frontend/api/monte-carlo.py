@@ -24,17 +24,25 @@ class handler(BaseHTTPRequestHandler):
             years = request_data.get('years', 25)
             withdrawal_rate = request_data.get('withdrawalRate', 5.0) / 100  # Convert to decimal
             inflation_input = request_data.get('inflation')  # None or number
-            stock_allocation = request_data.get('stockAllocation', 70) / 100
-            bond_allocation = request_data.get('bondAllocation', 30) / 100
+            run_allocation_sweep = request_data.get('allocationSweep', False)
 
-            # Run Monte Carlo simulation
-            result = run_monte_carlo(
-                years=years,
-                withdrawal_rate=withdrawal_rate,
-                inflation_input=inflation_input,
-                stock_allocation=stock_allocation,
-                bond_allocation=bond_allocation
-            )
+            # Run allocation sweep or single simulation
+            if run_allocation_sweep:
+                result = run_allocation_sweep_analysis(
+                    years=years,
+                    withdrawal_rate=withdrawal_rate,
+                    inflation_input=inflation_input
+                )
+            else:
+                stock_allocation = request_data.get('stockAllocation', 70) / 100
+                bond_allocation = request_data.get('bondAllocation', 30) / 100
+                result = run_monte_carlo(
+                    years=years,
+                    withdrawal_rate=withdrawal_rate,
+                    inflation_input=inflation_input,
+                    stock_allocation=stock_allocation,
+                    bond_allocation=bond_allocation
+                )
 
             # Send response
             self.send_response(200)
@@ -189,4 +197,64 @@ def run_monte_carlo(years, withdrawal_rate, inflation_input, stock_allocation, b
             'medianYearsToFailure': round(median_years_to_failure, 1) if median_years_to_failure else None,
             'usedBootstrap': use_bootstrap_inflation
         }
+    }
+
+
+def run_allocation_sweep_analysis(years, withdrawal_rate, inflation_input, num_simulations=100):
+    """
+    Run Monte Carlo simulations across different stock/bond allocations
+
+    Tests allocations from 0% stocks to 100% stocks in 10% increments
+    (11 total combinations: 0/100, 10/90, 20/80, ... 100/0)
+
+    Returns:
+    - Array of results for each allocation
+    - Best allocation recommendation
+    """
+
+    allocations = []
+    results = []
+
+    # Test allocations from 0% to 100% stocks in 10% increments
+    for stock_pct in range(0, 101, 10):
+        stock_allocation = stock_pct / 100
+        bond_allocation = (100 - stock_pct) / 100
+
+        # Run Monte Carlo for this allocation
+        result = run_monte_carlo(
+            years=years,
+            withdrawal_rate=withdrawal_rate,
+            inflation_input=inflation_input,
+            stock_allocation=stock_allocation,
+            bond_allocation=bond_allocation,
+            num_simulations=num_simulations
+        )
+
+        allocations.append({
+            'stockPercent': stock_pct,
+            'bondPercent': 100 - stock_pct,
+            'successRate': result['successRate'],
+            'successes': result['successes'],
+            'failures': result['failures'],
+            'avgFinalPortfolio': result['details']['avgFinalPortfolio'],
+            'medianYearsToFailure': result['details']['medianYearsToFailure']
+        })
+
+        results.append(result['successRate'])
+
+    # Find best allocation (highest success rate)
+    best_idx = results.index(max(results))
+    best_allocation = allocations[best_idx]
+
+    return {
+        'type': 'allocationSweep',
+        'allocations': allocations,
+        'bestAllocation': {
+            'stockPercent': best_allocation['stockPercent'],
+            'bondPercent': best_allocation['bondPercent'],
+            'successRate': best_allocation['successRate']
+        },
+        'totalCombinations': len(allocations),
+        'simulationsPerCombination': num_simulations,
+        'totalSimulations': len(allocations) * num_simulations
     }
