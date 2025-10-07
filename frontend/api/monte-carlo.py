@@ -137,6 +137,7 @@ def run_monte_carlo(years, withdrawal_rate, inflation_input, stock_allocation, b
 
         failed = False
         failure_month = None
+        annual_inflation_multiplier = 1.0  # Track compounded inflation over the year
 
         for month in range(total_months):
             # Randomly select a historical month (bootstrap)
@@ -148,6 +149,10 @@ def run_monte_carlo(years, withdrawal_rate, inflation_input, stock_allocation, b
                 inflation = historical_inflation
             else:
                 inflation = monthly_inflation_fixed
+
+            # Accumulate inflation throughout the year
+            if use_bootstrap_inflation:
+                annual_inflation_multiplier *= (1 + inflation)
 
             # Apply returns to portfolio
             stock_value = portfolio * stock_allocation * (1 + stock_return)
@@ -161,8 +166,9 @@ def run_monte_carlo(years, withdrawal_rate, inflation_input, stock_allocation, b
             if (month + 1) % 12 == 0:
                 # Calculate annual inflation from past 12 months
                 if use_bootstrap_inflation:
-                    # Use compounded inflation from bootstrapped data
-                    monthly_withdrawal *= (1 + inflation)
+                    # Use compounded inflation from bootstrapped data over the past 12 months
+                    monthly_withdrawal *= annual_inflation_multiplier
+                    annual_inflation_multiplier = 1.0  # Reset for next year
                 else:
                     # Use fixed annual inflation rate
                     monthly_withdrawal *= (1 + inflation_input / 100)

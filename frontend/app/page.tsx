@@ -42,6 +42,7 @@ export default function Home() {
   const [isListening, setIsListening] = useState<string | null>(null);
   const [isSimulating, setIsSimulating] = useState(false);
   const [sweepResults, setSweepResults] = useState<AllocationSweepResult | null>(null);
+  const [usedSpeechInput, setUsedSpeechInput] = useState(false);
 
   // Text-to-speech function with female voice
   const speak = (text: string) => {
@@ -106,6 +107,7 @@ export default function Home() {
       const numberMatch = transcript.match(/\d+(\.\d+)?/);
       if (numberMatch) {
         handleInputChange(field, numberMatch[0]);
+        setUsedSpeechInput(true); // Track that user used speech input
       } else {
         alert(`I heard: "${transcript}". Please say a number.`);
       }
@@ -215,8 +217,10 @@ export default function Home() {
       const data: AllocationSweepResult = await response.json();
       setSweepResults(data);
 
-      // Announce results for screen readers
-      speak(`Allocation sweep complete. Tested ${data.totalCombinations} different allocations. Best allocation is ${data.bestAllocation.stockPercent} percent stocks with a ${data.bestAllocation.successRate.toFixed(1)} percent success rate.`);
+      // Announce results for screen readers only if user used speech input
+      if (usedSpeechInput) {
+        speak(`Allocation sweep complete. Tested ${data.totalCombinations} different allocations. Best allocation is ${data.bestAllocation.stockPercent} percent stocks with a ${data.bestAllocation.successRate.toFixed(1)} percent success rate.`);
+      }
     } catch (error) {
       console.error('Allocation sweep error:', error);
       alert('Sorry, the allocation sweep failed. Please try again.');
@@ -272,7 +276,7 @@ export default function Home() {
                     className={`flex-1 px-6 py-4 text-2xl border-2 rounded-lg focus:ring-4 focus:ring-blue-500 focus:border-blue-500 ${
                       errors.yearsInRetirement ? 'border-red-500 bg-red-50' : 'border-gray-300 bg-gray-50'
                     }`}
-                    placeholder="25"
+                    placeholder=""
                     min="1"
                     max="60"
                     step="1"
@@ -333,7 +337,7 @@ export default function Home() {
                       className={`w-full px-6 py-4 pr-16 text-2xl border-2 rounded-lg focus:ring-4 focus:ring-blue-500 focus:border-blue-500 ${
                         errors.withdrawalRate ? 'border-red-500 bg-red-50' : 'border-gray-300 bg-gray-50'
                       }`}
-                      placeholder="4"
+                      placeholder=""
                       min="0.1"
                       max="20"
                       step="0.1"
@@ -401,7 +405,7 @@ export default function Home() {
                       className={`w-full px-6 py-4 pr-16 text-2xl border-2 rounded-lg focus:ring-4 focus:ring-blue-500 focus:border-blue-500 ${
                         errors.inflationRate ? 'border-red-500 bg-red-50' : 'border-gray-300 bg-gray-50'
                       }`}
-                      placeholder="3"
+                      placeholder=""
                       min="0"
                       max="10"
                       step="0.1"
